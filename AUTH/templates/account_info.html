@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block title %}Аккаунт {{ account.username }}{% endblock %}
+
+{% block content %}
+
+{% if account != None %}
+    <h2>@{{ account.username }}</h2>
+    <img src="{{ account.avatar.url }}" alt="Твой аватар" class="big-user-avatar">
+    <p>{{ account.first_name }} {{ account.last_name }}</p>
+
+    {% if account.is_superuser %}
+        <p>ОН ЗДЕСЬ ПАПОЧКА!</p>
+    {% elif account.is_staff %}
+        <p>Крутышка сотрудник</p>
+    {% else %}
+        <p>смертный</p>
+    {% endif %}
+    <p>Последнее обновление {{ account.last_updated }}</p>
+{% else %}
+    <p>Такого пользователя не существует</p>
+{% endif %}
+
+{% endblock %}

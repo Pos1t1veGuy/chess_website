@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}Топ игроков{% endblock %}
+
+{% block content %}
+<style>
+    /* Стили для таблицы */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    th, td {
+        border: 1px solid #dddddd;
+        text-align: left;
+        padding: 8px;
+    }
+    th {
+        background-color: #f2f2f2;
+    }
+    tr:nth-child(even) {
+        background-color: #f2f2f2;
+    }
+</style>
+
+<table>
+    <thead>
+        <tr>
+            <th>Ник</th>
+            <th>Счет</th>
+            <th>Уровень</th>
+            <th>Винрейт</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for iuser in users %}
+        <tr>
+            <td>
+                {% if iuser.first_name != '' and iuser.last_name != '' %}
+                    {{ iuser.first_name }} {{ iuser.last_name }}
+                {% elif iuser.first_name != '' and iuser.last_name == '' %}
+                    {{ iuser.first_name }}
+                {% else %}
+                    @{{ iuser.username }}
+                {% endif %}
+            </td>
+            <td>{{ iuser.global_score }}</td>
+            <td>{{ iuser.level }}</td>
+            <td>{{ iuser.winrate }}%</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block title %}Регистрация или авторизация{% endblock %}
+
+{% block content %}
+
+<h2>Авторизация</h2>
+<form method="post" action="{% url 'auth:auth' %}">
+    {% csrf_token %}
+    <input type="hidden" name="type" value="auth">
+    <label for="login">Почта/Ник:</label>
+    <input type="text" name="email_or_username" required>
+    <br>
+    <label for="password">Пароль:</label>
+    <input type="password" name="password" required>
+    <br>
+    <button type="submit">Войти</button>
+</form>
+{{ auth_error }}
+
+<h2>Регистрация</h2>
+<form method="post" action="{% url 'auth:auth' %}">
+    {% csrf_token %}
+    <input type="hidden" name="type" value="reg">
+    <label for="username">Ник:</label>
+    <input type="text" name="username" required>
+    <br>
+    <label for="email">Почта:</label>
+    <input type="email" name="email" required>
+    <br>
+    <label for="password">Пароль:</label>
+    <input type="password" name="password" required>
+    <br>
+    <button type="submit">Зарегистрироваться</button>
+</form>
+{{ reg_error }}
+
+{% endblock %}
