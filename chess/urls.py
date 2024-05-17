@@ -10,7 +10,7 @@ from .views import api
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('account/', include('AUTH.urls')),
-    path('api/', api.as_view()),
+    path('api/', api.as_view(), name='api'),
     path('', include('game.urls')),
 ]
 
