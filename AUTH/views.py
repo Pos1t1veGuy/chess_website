@@ -105,8 +105,6 @@ class login_or_register(View):
 @login_required(login_url='auth:anonimus')
 def info(request):
     return account_info(request, request.user)
-def anonimus(request):
-    return render(request, 'anonimus.html')
 
 @login_required(login_url='auth:anonimus')
 def logout_view(request):

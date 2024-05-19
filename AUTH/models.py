@@ -59,6 +59,10 @@ class User(AbstractUser):
         return list(white_games) + list(black_games)
 
     @property
+    def games_count(self) -> int:
+        return len(self.games)
+
+    @property
     def winrate(self) -> float:
         if self.losses > 0 and self.wins > 0:
             return round(self.wins/self.losses*100, 1)

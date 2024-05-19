@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Игра {{ white.username }} VS {{ black.username }}{% endblock %}
+
+{% block content %}
+
+<!-- Передан game, который содержит данные об игре -->
+Краткая инфа о игре:
+    Белый
+    <img src="{{ white.avatar.url }}" alt="Аватар {{ white.username }}" class="big-user-avatar">
+    {% if white.first_name != '' and white.last_name != '' %}
+        {{ white.first_name }} {{ white.last_name }}
+    {% elif white.first_name != '' and white.last_name == '' %}
+        {{ white.first_name }}
+    {% else %}
+        @{{ white.username }}
+    {% endif %}
+    Счет (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'white_score' -->)
+    Время (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'white_passed_time' -->) / {{ game.max_time }}
+    Потеряно фигур (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'destroyed_white_pieces' -->)
+
+    Черный
+    <img src="{{ black.avatar.url }}" alt="Аватар {{ black.username }}" class="big-user-avatar">
+    {% if black.first_name != '' and black.last_name != '' %}
+        {{ black.first_name }} {{ black.last_name }}
+    {% elif black.first_name != '' and black.last_name == '' %}
+        {{ black.first_name }}
+    {% else %}
+        @{{ black.username }}
+    {% endif %}
+    Счет (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'black_score' -->)
+    Время (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'black_passed_time' -->) / {{ game.max_time }}
+    Потеряно фигур (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'destroyed_black_pieces' -->)
+
+Победитель ... или Победитель пока не определен (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'winner' -->)
+
+Последний ход был (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'last_movement_time' -->)
+Начало игры {{ game.start_time }}
+Игра продолжается или Игра окончена (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'playing' bool и 'end_time' str/None -->)
+
+<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'board' List[List[str]] -->
+
+<!-- Нужно задизайнить под две карточки с краткой инфой в одной большой, слева - белый игрок, справа - черный игрок, снизу общая инфа об игре -->
+
+{% endblock %}

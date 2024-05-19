@@ -1,5 +1,3 @@
-<!-- base.html -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,43 +6,88 @@
     <title>{% block title %}Site{% endblock %}</title>
     <style>
         .user-avatar {
-            width: 25px;
-            height: 25px;
-            border-radius: 20%;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
         }
         .big-user-avatar {
-            width: 200px;
-            height: 200px;
+            width: 250px;
+            height: 250px;
             border-radius: 10%;
         }
-        .survey-avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 10%;
+        body.dark-theme {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
         }
+
+        header nav ul {
+            list-style-type: none;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px;
+            margin: 0;
+            background-color: #333;
+            border-radius: 10px;
+        }
+
+        header nav ul li {
+            display: inline;
+        }
+
+        header nav ul li a, header nav ul li button {
+            color: #ffffff;
+            text-decoration: none;
+            padding: 14px 20px;
+            display: block;
+            border-radius: 10px;
+            transition: background-color 0.3s ease;
+        }
+
+        header nav ul li a:hover, header nav ul li button:hover {
+            background-color: #575757;
+        }
+
+        #start-game-button {
+            background-color: #ff5722;
+            color: #ffffff;
+            border: none;
+            padding: 15px 25px;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: background-color 0.3s ease;
+        }
+
+        #start-game-button:hover {
+            background-color: #e64a19;
+        }
+
         #timer-menu {
             display: none;
         }
+
+        main {
+            padding: 20px;
+        }
     </style>
 </head>
-<body>
-
+<body class="dark-theme">
     <header>
         <nav>
             <ul>
-                <li><a href="{% url 'chess:home' %}"></a></li>
-                <button onclick="start()">Играть</button>
-                {% if user.username != '' %}
-                    <li><a href="{% url 'auth:info' %}">{{ user.username }}</a>
-                        <img src="{{ user.avatar.url }}" alt="Твой аватар" class="user-avatar"></li>
+                <li><a href="{% url 'chess:home' %}">Главная</a></li>
+                <li><a href="{% url 'chess:leaders' %}">Список лидеров</a></li>
+                <li><button id="start-game-button" onclick="startGame()">Играть</button></li>
+                {% if user.is_authenticated %}
+                    <li><a href="{% url 'auth:info' %}">{{ user.username }}</a></li>
+                    <li><img src="{{ user.avatar.url }}" alt="Твой аватар" class="user-avatar"></li>
                     <li><a href="{% url 'auth:logout' %}">Выход</a></li>
                 {% else %}
                     <li><a href="{% url 'auth:auth' %}">Регистрация/Вход</a></li>
                 {% endif %}
             </ul>
-
             <div id="timer-menu">
-                <p>Timer: <span id="timer">0</span> seconds</p>
+                <p>Таймер: <span id="timer">0</span> секунд</p>
             </div>
         </nav>
     </header>
@@ -54,8 +97,10 @@
     </main>
 
     <script>
-        const start = () => {alert(1)}
+        function startGame() {
+            alert('Игра началась!');
+            // Здесь можно добавить код для начала игры
+        }
     </script>
-
 </body>
 </html>

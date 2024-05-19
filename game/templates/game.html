@@ -4,6 +4,7 @@
 
 {% block content %}
 <style>
+    /* Стили для таблицы */
     table {
         width: 100%;
         border-collapse: collapse;
@@ -28,7 +29,6 @@
             <th>Ник</th>
             <th>Счет</th>
             <th>Уровень</th>
-            <th>Количество игр</th>
             <th>Винрейт</th>
         </tr>
     </thead>
@@ -46,14 +46,10 @@
             </td>
             <td>{{ iuser.global_score }}</td>
             <td>{{ iuser.level }}</td>
-            <td>{{ iuser.games_count }}</td>
             <td>{{ iuser.winrate }}%</td>
         </tr>
     {% endfor %}
     </tbody>
 </table>
-
-<!-- Динамически подгружать таблицу порциями запросом к api/?key=leaders&portion=int&index=int -->
-<!-- Ответ от апи содаржит json список словарей с ключами username, first_name, last_name, global_score, level, games_count, winrate -->
 
 {% endblock %}
