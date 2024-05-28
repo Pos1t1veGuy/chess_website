@@ -3,63 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <title>{% block title %}Site{% endblock %}</title>
     <style>
-        .user-avatar {
+        .profile-button {
+            display: flex;
+            align-items: center;
+            color: #ffffff;
+            text-decoration: none;
+        }
+
+        .profile-button img {
             width: 50px;
             height: 50px;
             border-radius: 50%;
-        }
-        .big-user-avatar {
-            width: 250px;
-            height: 250px;
-            border-radius: 10%;
-        }
-        body.dark-theme {
-            background-color: #121212;
-            color: #ffffff;
-            font-family: Arial, sans-serif;
-        }
-
-        header nav ul {
-            list-style-type: none;
-            display: flex;
-            justify-content: space-around;
-            padding: 10px;
-            margin: 0;
-            background-color: #333;
-            border-radius: 10px;
-        }
-
-        header nav ul li {
-            display: inline;
-        }
-
-        header nav ul li a, header nav ul li button {
-            color: #ffffff;
-            text-decoration: none;
-            padding: 14px 20px;
-            display: block;
-            border-radius: 10px;
-            transition: background-color 0.3s ease;
-        }
-
-        header nav ul li a:hover, header nav ul li button:hover {
-            background-color: #575757;
-        }
-
-        #start-game-button {
-            background-color: #ff5722;
-            color: #ffffff;
-            border: none;
-            padding: 15px 25px;
-            cursor: pointer;
-            border-radius: 10px;
-            transition: background-color 0.3s ease;
-        }
-
-        #start-game-button:hover {
-            background-color: #e64a19;
+            margin-right: 10px;
         }
 
         #timer-menu {
@@ -77,15 +35,19 @@
             <ul>
                 <li><a href="{% url 'chess:home' %}">Главная</a></li>
                 <li><a href="{% url 'chess:leaders' %}">Список лидеров</a></li>
-                <li><button id="start-game-button" onclick="startGame()">Играть</button></li>
                 {% if user.is_authenticated %}
-                    <li><a href="{% url 'auth:info' %}">{{ user.username }}</a></li>
-                    <li><img src="{{ user.avatar.url }}" alt="Твой аватар" class="user-avatar"></li>
+                    <li>
+                        <a href="{% url 'auth:info' %}" class="profile-button">
+                            <img src="{{ user.avatar.url }}" alt="Твой аватар">
+                            <span>{{ user.username }}</span>
+                        </a>
+                    </li>
                     <li><a href="{% url 'auth:logout' %}">Выход</a></li>
                 {% else %}
                     <li><a href="{% url 'auth:auth' %}">Регистрация/Вход</a></li>
                 {% endif %}
             </ul>
+            <button id="start-game-button">Играть</button>
             <div id="timer-menu">
                 <p>Таймер: <span id="timer">0</span> секунд</p>
             </div>
@@ -96,11 +58,30 @@
         {% block content %}{% endblock %}
     </main>
 
+    <button id="send-message">Send Message</button>
+    <div id="messages"></div>
+
     <script>
-        function startGame() {
-            alert('Игра началась!');
-            // Здесь можно добавить код для начала игры
-        }
+        const ws = new WebSocket('ws://' + window.location.host + '/ws/chess/');
+
+        ws.onopen = function(event) {
+            console.log('WebSocket is open now.');
+        };
+
+        ws.onmessage = function(event) {
+            const message = JSON.parse(event.data).message;
+            document.getElementById('messages').innerHTML += `<div>${message}</div>`;
+        };
+
+        ws.onclose = function(event) {
+            console.log('WebSocket is closed now.');
+        };
+
+        document.getElementById('send-message').onclick = function() {
+            const message = 'Hello, WebSocket!';
+            ws.send(JSON.stringify({ 'message': message }));
+        };
+    </script>
     </script>
 </body>
 </html>

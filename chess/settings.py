@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
-import os
+import os, importlib
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,11 +27,16 @@ SECRET_KEY = 'django-insecure-zg4%zs4id%$z8@h06(%+v93_kq_^oe-12dzc5dty443c2d#*3)
 DEBUG = True
 
 ALLOWED_HOSTS = []
-
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
 
 # Application definition
 
 INSTALLED_APPS = [
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -71,6 +76,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'chess.wsgi.application'
+ASGI_APPLICATION = 'chess.asgi.application'
 
 
 # Database
