@@ -1,7 +1,4 @@
-
-print(1234)
 import os, sys
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack

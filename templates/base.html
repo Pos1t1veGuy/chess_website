@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <title>{% block title %}Site{% endblock %}</title>
     <style>
         .profile-button {
@@ -47,7 +46,8 @@
                     <li><a href="{% url 'auth:auth' %}">Регистрация/Вход</a></li>
                 {% endif %}
             </ul>
-            <button id="start-game-button">Играть</button>
+            
+            <button id="start-game-button" onclick="start_game()">Начать игру</button>
             <div id="timer-menu">
                 <p>Таймер: <span id="timer">0</span> секунд</p>
             </div>
@@ -58,30 +58,54 @@
         {% block content %}{% endblock %}
     </main>
 
-    <button id="send-message">Send Message</button>
     <div id="messages"></div>
 
     <script>
-        const ws = new WebSocket('ws://' + window.location.host + '/ws/chess/');
+        let ws;
+        let timerInterval;
 
-        ws.onopen = function(event) {
-            console.log('WebSocket is open now.');
+        const start_button = document.querySelector("#start-game-button");
+        const timerElement = document.getElementById("timer-menu");
+        const timerSpan = document.getElementById("timer");
+
+
+        const start_game = () => {
+            ws = new WebSocket('ws://' + window.location.host + '/ws/chess/');
+
+            ws.onopen = function(event) {
+                console.log('WebSocket is open now.');
+            };
+
+            ws.onmessage = function(event) {
+                const message = JSON.parse(event.data).message;
+                document.getElementById('messages').innerHTML += `<div>${message}</div>`;
+            };
+
+            ws.onclose = function(event) {
+                console.log('WebSocket is closed now.');
+            };
+
+            start_button.textContent = "Прервать поиск";
+            start_button.onclick = stop_game;
+
+            let seconds = 0;
+            timerElement.style.display = "block";
+            timerInterval = setInterval(() => {
+                seconds++;
+                timerSpan.textContent = seconds;
+            }, 1000);
         };
 
-        ws.onmessage = function(event) {
-            const message = JSON.parse(event.data).message;
-            document.getElementById('messages').innerHTML += `<div>${message}</div>`;
+        const stop_game = () => {
+            start_button.textContent = "Начать игру";
+            start_button.onclick = start_game;
+            if (ws != null) {
+                ws.close();
+            }
+            clearInterval(timerInterval);
+            timerElement.style.display = "none";
+            timerSpan.textContent = "0";
         };
-
-        ws.onclose = function(event) {
-            console.log('WebSocket is closed now.');
-        };
-
-        document.getElementById('send-message').onclick = function() {
-            const message = 'Hello, WebSocket!';
-            ws.send(JSON.stringify({ 'message': message }));
-        };
-    </script>
     </script>
 </body>
 </html>
