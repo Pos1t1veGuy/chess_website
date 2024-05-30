@@ -48,8 +48,15 @@
             </ul>
             
             <button id="start-game-button" onclick="start_game()">Начать игру</button>
+            <form id="time-range-form">
+                <label for="min-time">Минимум минут на игру:</label>
+                <input type="number" id="min-time" name="min-time" min="1" max="60" value="1">
+                
+                <label for="max-time">Максимум минут на игру:</label>
+                <input type="number" id="max-time" name="max-time" min="1" max="60" value="10">
+            </form>
             <div id="timer-menu">
-                <p>Таймер: <span id="timer">0</span> секунд</p>
+                <p>Таймер: <span id="timer">0:00</span></p>
             </div>
         </nav>
     </header>
@@ -68,12 +75,33 @@
         const timerElement = document.getElementById("timer-menu");
         const timerSpan = document.getElementById("timer");
 
+        const form = document.getElementById("time-range-form");
+        const minTimeInput = document.getElementById("min-time");
+        const maxTimeInput = document.getElementById("max-time");
+
+
+        const validateTimeRange = () => {
+            let minTime = parseInt(minTimeInput.value);
+            let maxTime = parseInt(maxTimeInput.value);
+
+            if (minTime >= maxTime) {
+                minTimeInput.value = maxTime - 1;
+            }
+        };
+
+        minTimeInput.addEventListener('change', validateTimeRange);
+        maxTimeInput.addEventListener('change', validateTimeRange);
 
         const start_game = () => {
             ws = new WebSocket('ws://' + window.location.host + '/ws/chess/');
 
             ws.onopen = function(event) {
                 console.log('WebSocket is open now.');
+                ws.send(JSON.stringify({
+                    'type': 'time_form',
+                    'min': form["min-time"].value,
+                    'max': form["max-time"].value
+                }));
             };
 
             ws.onmessage = function(event) {
@@ -92,7 +120,9 @@
             timerElement.style.display = "block";
             timerInterval = setInterval(() => {
                 seconds++;
-                timerSpan.textContent = seconds;
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                timerSpan.textContent = `${mins}:${secs < 10 ? `0${secs}` : secs}`;
             }, 1000);
         };
 

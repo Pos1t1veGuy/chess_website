@@ -84,6 +84,7 @@ class Game(models.Model):
 	end_time = models.DateTimeField(null=True, blank=True, verbose_name='End Time')
 	max_time = models.IntegerField(verbose_name='Maximum Time (seconds)', default=15 * 60)
 	last_movement_time = models.DateTimeField(auto_now=True, verbose_name='Last Movement Time')
+	created_at = models.DateTimeField(auto_now=True, verbose_name='Creation Time')
 
 	white_player = models.ForeignKey(User, on_delete=models.CASCADE, related_name='white_player_games', verbose_name='White Player')
 	black_player = models.ForeignKey(User, on_delete=models.CASCADE, related_name='black_player_games', verbose_name='Black Player')
