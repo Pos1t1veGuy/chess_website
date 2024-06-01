@@ -47,17 +47,19 @@
                 {% endif %}
             </ul>
             
-            <button id="start-game-button" onclick="start_game()">Начать игру</button>
-            <form id="time-range-form">
-                <label for="min-time">Минимум минут на игру:</label>
-                <input type="number" id="min-time" name="min-time" min="1" max="60" value="1">
-                
-                <label for="max-time">Максимум минут на игру:</label>
-                <input type="number" id="max-time" name="max-time" min="1" max="60" value="10">
-            </form>
-            <div id="timer-menu">
-                <p>Таймер: <span id="timer">0:00</span></p>
-            </div>
+            {% if user.is_authenticated %}
+                <button id="start-game-button" onclick="start_game()">Начать игру</button>
+                <form id="time-range-form">
+                    <label for="min-time">Минимум минут на игру:</label>
+                    <input type="number" id="min-time" name="min-time" min="1" max="60" value="1">
+                    
+                    <label for="max-time">Максимум минут на игру:</label>
+                    <input type="number" id="max-time" name="max-time" min="1" max="60" value="10">
+                </form>
+                <div id="timer-menu">
+                    <p>Таймер: <span id="timer">0:00</span></p>
+                </div>
+            {% endif %}
         </nav>
     </header>
 
@@ -93,7 +95,7 @@
         maxTimeInput.addEventListener('change', validateTimeRange);
 
         const start_game = () => {
-            ws = new WebSocket('ws://' + window.location.host + '/ws/chess/');
+            ws = new WebSocket('ws://' + window.location.host + '/ws/queue/');
 
             ws.onopen = function(event) {
                 console.log('WebSocket is open now.');
@@ -106,11 +108,13 @@
 
             ws.onmessage = function(event) {
                 const message = JSON.parse(event.data).message;
+                console.log(message);
                 document.getElementById('messages').innerHTML += `<div>${message}</div>`;
             };
 
             ws.onclose = function(event) {
                 console.log('WebSocket is closed now.');
+                stop_game()
             };
 
             start_button.textContent = "Прервать поиск";

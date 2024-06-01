@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from asgiref.sync import sync_to_async
 
 from typing import *
 
@@ -34,6 +35,16 @@ class User(AbstractUser):
     last_updated = models.DateTimeField(auto_now=True, verbose_name='Last Update')
     global_score = models.IntegerField(default=0, verbose_name='Global Score')
     level = models.IntegerField(default=1, verbose_name='Level')
+
+    @sync_to_async
+    def get_level(self) -> int:
+        return self.level
+    @sync_to_async
+    def get_winrate(self) -> int:
+        return self.winrate
+    @sync_to_async
+    def get_games_count(self) -> int:
+        return self.games_count
 
     def save(self, *args, **kwargs):
         if self.id:
