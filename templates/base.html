@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     <title>{% block title %}Site{% endblock %}</title>
     <style>
         .profile-button {
@@ -58,6 +59,13 @@
                 </form>
                 <div id="timer-menu">
                     <p>Таймер: <span id="timer">0:00</span></p>
+
+                    <p>Людей в очереди: <span id="queue_count">0</span></p>
+                    Средняя статистика игроков:
+                    <p>Сыграно матчей: <span id="games_count">0</span></p>
+                    <p>Винрейт: <span id="winrate">0</span></p>
+                    <p>Уровень: <span id="level">1</span></p>
+                    <p>Счет: <span id="score">0</span></p>
                 </div>
             {% endif %}
         </nav>
@@ -67,79 +75,127 @@
         {% block content %}{% endblock %}
     </main>
 
-    <div id="messages"></div>
-
     <script>
-        let ws;
-        let timerInterval;
+        let ws
+        let timerInterval
 
-        const start_button = document.querySelector("#start-game-button");
-        const timerElement = document.getElementById("timer-menu");
-        const timerSpan = document.getElementById("timer");
+        const start_button = document.querySelector("#start-game-button")
+        const timerElement = document.getElementById("timer-menu")
+        const timerSpan = document.getElementById("timer")
+        const queue_count_info = document.getElementById('queue_count')
+        const games_count_info = document.getElementById('games_count')
+        const winrate_info = document.getElementById('winrate')
+        const level_info = document.getElementById('level')
+        const score_info = document.getElementById('score')
 
-        const form = document.getElementById("time-range-form");
-        const minTimeInput = document.getElementById("min-time");
-        const maxTimeInput = document.getElementById("max-time");
+        const form = document.getElementById("time-range-form")
+        const minTimeInput = document.getElementById("min-time")
+        const maxTimeInput = document.getElementById("max-time")
 
 
         const validateTimeRange = () => {
-            let minTime = parseInt(minTimeInput.value);
-            let maxTime = parseInt(maxTimeInput.value);
+            let minTime = parseInt(minTimeInput.value)
+            let maxTime = parseInt(maxTimeInput.value)
 
             if (minTime >= maxTime) {
-                minTimeInput.value = maxTime - 1;
+                minTimeInput.value = maxTime - 1
             }
-        };
+        }
 
-        minTimeInput.addEventListener('change', validateTimeRange);
-        maxTimeInput.addEventListener('change', validateTimeRange);
+        minTimeInput.addEventListener('change', validateTimeRange)
+        maxTimeInput.addEventListener('change', validateTimeRange)
+
+        const getSafeValue = (value, def = '') => {
+            return value != undefined ? value : def;
+        }
 
         const start_game = () => {
-            ws = new WebSocket('ws://' + window.location.host + '/ws/queue/');
+            ws = new WebSocket('ws://' + window.location.host + '/ws/queue/')
 
             ws.onopen = function(event) {
-                console.log('WebSocket is open now.');
+                console.log('WebSocket is open now.')
                 ws.send(JSON.stringify({
                     'type': 'time_form',
                     'min': form["min-time"].value,
                     'max': form["max-time"].value
-                }));
-            };
+                }))
+            }
 
             ws.onmessage = function(event) {
-                const message = JSON.parse(event.data).message;
-                console.log(message);
-                document.getElementById('messages').innerHTML += `<div>${message}</div>`;
-            };
+                console.log('message is received')
+                const data = JSON.parse(event.data)
+
+                switch (data.type) {
+                    case 'queue_players_info':
+                        queue_count_info.textContent = getSafeValue(data.count, queue_count_info.textContent)
+                        games_count_info.textContent = getSafeValue(data.games, games_count_info.textContent)
+                        level_info.textContent = getSafeValue(data.level, level_info.textContent)
+                        score_info.textContent = getSafeValue(data.score, score_info.textContent)
+                        winrate_info.textContent = getSafeValue(data.winrate, winrate_info.textContent)
+                        break
+                    case 'game_found':
+                        console.log('game is found')
+                        const time = getSafeValue(data.max_time, 'Неизвестно')
+                        const formattedTime = typeof time === 'number' ? `${time} минут (${time * 60} секунд)` : time
+
+                        Swal.fire({
+                            title: 'Подтвердите готовность',
+                            html: `
+                                <p>Время игры: ${formattedTime}</p>
+                                <p>Ваш соперник:</p>
+                                ${getSafeValue(data.opponent.avatar) ? `<img src="${data.opponent.avatar}" alt="Аватарка соперника" width="100" height="100">` : ''}
+                                <p>Имя: ${getSafeValue(data.opponent.name, 'Неизвестно')}</p>
+                                <p>Уровень: ${getSafeValue(data.opponent.level, 'Неизвестно')}</p>
+                                <p>Winrate: ${data.opponent.winrate != undefined ? data.opponent.winrate + '%' : 'Неизвестно'}</p>
+                            `,
+                            showCancelButton: true,
+                            confirmButtonText: 'Играть',
+                            cancelButtonText: 'Отменить'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                ws.send(JSON.stringify( {'type': 'i_am_ready'} ))
+                            } else {
+                                console.log(12345)
+                                ws.send(JSON.stringify( {'type': 'cancel_game'} ))
+                            }
+                        })
+                        break
+
+                    case 'game_is_canceled':
+                        console.log('game is canceled')
+                        Swal.close()
+                        break
+                }
+            }
 
             ws.onclose = function(event) {
-                console.log('WebSocket is closed now.');
+                console.log('WebSocket is closed now.')
                 stop_game()
-            };
+            }
 
-            start_button.textContent = "Прервать поиск";
-            start_button.onclick = stop_game;
+            start_button.textContent = "Прервать поиск"
+            start_button.onclick = stop_game
 
-            let seconds = 0;
-            timerElement.style.display = "block";
+            let seconds = 0
+            timerElement.style.display = "block"
             timerInterval = setInterval(() => {
-                seconds++;
-                const mins = Math.floor(seconds / 60);
-                const secs = seconds % 60;
-                timerSpan.textContent = `${mins}:${secs < 10 ? `0${secs}` : secs}`;
-            }, 1000);
-        };
+                seconds++
+                const mins = Math.floor(seconds / 60)
+                const secs = seconds % 60
+                timerSpan.textContent = `${mins}:${secs < 10 ? `0${secs}` : secs}`
+            }, 1000)
+        }
 
         const stop_game = () => {
-            start_button.textContent = "Начать игру";
-            start_button.onclick = start_game;
+            start_button.textContent = "Начать игру"
+            start_button.onclick = start_game
             if (ws != null) {
-                ws.close();
+                ws.close()
             }
-            clearInterval(timerInterval);
-            timerElement.style.display = "none";
-            timerSpan.textContent = "0";
-        };
+            clearInterval(timerInterval)
+            timerElement.style.display = "none"
+            timerSpan.textContent = "0"
+        }
     </script>
 </body>
 </html>

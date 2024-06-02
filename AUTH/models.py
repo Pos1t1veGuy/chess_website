@@ -36,16 +36,6 @@ class User(AbstractUser):
     global_score = models.IntegerField(default=0, verbose_name='Global Score')
     level = models.IntegerField(default=1, verbose_name='Level')
 
-    @sync_to_async
-    def get_level(self) -> int:
-        return self.level
-    @sync_to_async
-    def get_winrate(self) -> int:
-        return self.winrate
-    @sync_to_async
-    def get_games_count(self) -> int:
-        return self.games_count
-
     def save(self, *args, **kwargs):
         if self.id:
             old_user = User.objects.get(pk=self.id)
@@ -109,3 +99,34 @@ class User(AbstractUser):
     @property
     def wins(self) -> int:
         return len(self.win_games)
+
+    @sync_to_async
+    def async_username(self) -> str:
+        return self.username
+    @sync_to_async
+    def async_email(self) -> str:
+        return self.email
+    @sync_to_async
+    def async_avatar(self) -> 'avatar':
+        return self.avatar
+    @sync_to_async
+    def async_level(self) -> int:
+        return self.level
+    @sync_to_async
+    def async_winrate(self) -> float:
+        return self.winrate
+    @sync_to_async
+    def async_games_count(self) -> int:
+        return self.games_count
+    @sync_to_async
+    def async_games(self) -> List['Game']:
+        return self.games
+    @sync_to_async
+    def async_wins(self) -> List['Game']:
+        return self.wins
+    @sync_to_async
+    def async_losses(self) -> List['Game']:
+        return self.losses
+    @sync_to_async
+    def async_score(self) -> int:
+        return self.global_score

@@ -29,18 +29,19 @@ class GameConfig(AppConfig):
                     break
 
                 players = random.choice([[user1, user2], [user2, user1]])
-                game = await sync_to_async(Game.objects.create)(white_player=players[0], black_player=players[1], max_time=max_time)
-                game.save()
+                print(players)
+                # game = await sync_to_async(Game.objects.create)(white_player=players[0], black_player=players[1], max_time=max_time)
+                # game.save()
 
-                print('accepted')
-                for user in players:
-                    if user in queue_consumers.keys():
-                        user_consumer = queue_consumers.get(user)
-                        await user_consumer.send(text_data=json.dumps({
-                            'type': 'game_info',
-                            'game_id': game.id,
-                        }))
-                        await user_consumer.close()
+                # print('accepted')
+                # for user in players:
+                #     if user in queue_consumers.keys():
+                #         user_consumer = queue_consumers.get(user)
+                #         await user_consumer.send(text_data=json.dumps({
+                #             'type': 'game_info',
+                #             'game_id': game.id,
+                #         }))
+                #         await user_consumer.close()
 
             await asyncio.sleep(1)
 
