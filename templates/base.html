@@ -60,9 +60,9 @@
                 <div id="timer-menu">
                     <p>Таймер: <span id="timer">0:00</span></p>
 
-                    <p>Людей в очереди: <span id="queue_count">0</span></p>
+                    <p>Людей в очереди: <span id="queue-count">0</span></p>
                     Средняя статистика игроков:
-                    <p>Сыграно матчей: <span id="games_count">0</span></p>
+                    <p>Сыграно матчей: <span id="games-count">0</span></p>
                     <p>Винрейт: <span id="winrate">0</span></p>
                     <p>Уровень: <span id="level">1</span></p>
                     <p>Счет: <span id="score">0</span></p>
@@ -77,13 +77,14 @@
 
     <script>
         let ws
-        let timerInterval
+        let timerInterval = null
+        let seconds
 
         const start_button = document.querySelector("#start-game-button")
         const timerElement = document.getElementById("timer-menu")
         const timerSpan = document.getElementById("timer")
-        const queue_count_info = document.getElementById('queue_count')
-        const games_count_info = document.getElementById('games_count')
+        const queue_count_info = document.getElementById('queue-count')
+        const games_count_info = document.getElementById('games-count')
         const winrate_info = document.getElementById('winrate')
         const level_info = document.getElementById('level')
         const score_info = document.getElementById('score')
@@ -137,6 +138,7 @@
                         console.log('game is found')
                         const time = getSafeValue(data.max_time, 'Неизвестно')
                         const formattedTime = typeof time === 'number' ? `${time} минут (${time * 60} секунд)` : time
+                        stop_timer()
 
                         Swal.fire({
                             title: 'Подтвердите готовность',
@@ -144,6 +146,7 @@
                                 <p>Время игры: ${formattedTime}</p>
                                 <p>Ваш соперник:</p>
                                 ${getSafeValue(data.opponent.avatar) ? `<img src="${data.opponent.avatar}" alt="Аватарка соперника" width="100" height="100">` : ''}
+                                <p id="opponent-readiness">Не готов</p>
                                 <p>Имя: ${getSafeValue(data.opponent.name, 'Неизвестно')}</p>
                                 <p>Уровень: ${getSafeValue(data.opponent.level, 'Неизвестно')}</p>
                                 <p>Winrate: ${data.opponent.winrate != undefined ? data.opponent.winrate + '%' : 'Неизвестно'}</p>
@@ -154,9 +157,11 @@
                         }).then((result) => {
                             if (result.isConfirmed) {
                                 ws.send(JSON.stringify( {'type': 'i_am_ready'} ))
+                                console.log('agreed')
                             } else {
-                                console.log(12345)
                                 ws.send(JSON.stringify( {'type': 'cancel_game'} ))
+                                console.log('game is canceled')
+                                start_timer(seconds)
                             }
                         })
                         break
@@ -164,6 +169,20 @@
                     case 'game_is_canceled':
                         console.log('game is canceled')
                         Swal.close()
+                        start_timer(seconds)
+                        break
+
+                    case 'opponent_is_ready':
+                        console.log('opponent is ready')
+                        const readness = document.getElementById("opponent-readiness")
+                        readness.textContent = 'Готов'
+                        break
+
+                    case 'game_info':
+                        console.log('opponent is ready')
+                        if (data.game_id) {
+                            
+                        }
                         break
                 }
             }
@@ -176,14 +195,8 @@
             start_button.textContent = "Прервать поиск"
             start_button.onclick = stop_game
 
-            let seconds = 0
             timerElement.style.display = "block"
-            timerInterval = setInterval(() => {
-                seconds++
-                const mins = Math.floor(seconds / 60)
-                const secs = seconds % 60
-                timerSpan.textContent = `${mins}:${secs < 10 ? `0${secs}` : secs}`
-            }, 1000)
+            start_timer()
         }
 
         const stop_game = () => {
@@ -192,9 +205,25 @@
             if (ws != null) {
                 ws.close()
             }
-            clearInterval(timerInterval)
             timerElement.style.display = "none"
             timerSpan.textContent = "0"
+            stop_timer()
+        }
+
+        const start_timer = (sec = 0) => {
+            seconds = sec
+            if (timerInterval != null) {
+                clearInterval(timerInterval)
+            }
+            timerInterval = setInterval(() => {
+                seconds++
+                const mins = Math.floor(seconds / 60)
+                const secs = seconds % 60
+                timerSpan.textContent = `${mins}:${secs < 10 ? `0${secs}` : secs}`
+            }, 1000)
+        }
+        const stop_timer = () => {
+            clearInterval(timerInterval)
         }
     </script>
 </body>
