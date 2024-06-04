@@ -19,7 +19,7 @@ class GameConfig(AppConfig):
 
             for con1 in self.queue_consumers:
                 for con2 in self.queue_consumers:
-                    if con1.user != con2.user and self.similar_players(con1.user, con2.user):
+                    if con1.user != con2.user and await self.similar_players(con1.user, con2.user):
                         intersection = list( list(set( range(con1.min, con1.max) ) & set( range(con2.min, con2.max) )) )
 
                         if len(intersection) > 0 and not con1.user in con2.black_list and not con2.user in con1.black_list:
@@ -37,18 +37,16 @@ class GameConfig(AppConfig):
 
     async def start_game(self, white: 'QueueConsumer', black: 'QueueConsumer', time: int):
         from .models import Game
-        #game = await sync_to_async(Game.objects.create)(white_player=white.user, black_player=black.user, max_time=time)
-        #await sync_to_async(game.save)()
+        game = await sync_to_async(Game.objects.create)(white_player=white.user, black_player=black.user, max_time=time)
+        await sync_to_async(game.save)()
 
-        print('accepted')
         for con in [white, black]:
             if con in self.queue_consumers:
                 await con.send(text_data=json.dumps({
                     'type': 'game_info',
-                    'game_id': 0#game.id,
+                    'game_id': game.id,
                 }))
-                await con.disconnect()
-                self.queue_consumers.remove(con)
+                await con.disconnect(0)
 
     async def similar_players(self, user1: 'User', user2: 'User') -> bool:
         # it means values in (user.value - interval -> user.value + interval)
@@ -56,8 +54,8 @@ class GameConfig(AppConfig):
         winrate_interval = 5
         games_interval = 10
 
-        if await user1.async_level() - level_interval <= await user2.async_level() <= await self.user.async_level() + level_interval:
-            if await user1.async_winrate() - winrate_interval <= await user2.async_winrate() <= await user1.async_winrate()+winrate_interval:
+        if await user1.async_level() - level_interval <= await user2.async_level() <= await user1.async_level() + level_interval:
+            if await user1.async_winrate() - winrate_interval <= await user2.async_winrate() <= await user1.async_winrate() + winrate_interval:
                 if await user1.async_games_count() - games_interval <= await user2.async_games_count() <= await user1.async_games_count() + games_interval:
                     return True
 

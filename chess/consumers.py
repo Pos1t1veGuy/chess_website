@@ -25,6 +25,7 @@ class QueueConsumer(AsyncWebsocketConsumer):
                 self.ready = False
                 self.clicked = False
                 self.opponent = None
+                self.end = False
                 self.black_list = []
 
                 self.min, self.max = 1, 60
@@ -46,12 +47,7 @@ class QueueConsumer(AsyncWebsocketConsumer):
     
     async def disconnect(self, close_code):
         await self.remove_from_queue()
-        if hasattr(self, 'matchmaking_task'):
-            self.matchmaking_task.cancel()
-            try:
-                await self.matchmaking_task
-            except asyncio.CancelledError:
-                pass
+        self.end = True
         self.close()
 
     async def receive(self, text_data):
@@ -80,8 +76,11 @@ class QueueConsumer(AsyncWebsocketConsumer):
     async def add_to_queue(self):
         global queue_consumers
         
-        if self.user.is_authenticated and not self in queue_consumers:
-            queue_consumers.append(self)
+        if self.user.is_authenticated:
+            if not self.user in [ con.user for con in queue_consumers ]:
+                queue_consumers.append(self)
+            else:
+                raise Exception('User already is in a queue')
         else:
             raise Exception('User is not authenticated')
 
@@ -98,16 +97,22 @@ class QueueConsumer(AsyncWebsocketConsumer):
         global queue_consumers
         
         while 1:
-            if queue_consumers:
-                await self.send(text_data=json.dumps({
-                    'type': 'queue_players_info',
-                    'count': len(queue_consumers),
-                    'winrate': sum([ await con.user.async_winrate() for con in queue_consumers ])/len(queue_consumers),
-                    'level': sum([ await con.user.async_level() for con in queue_consumers ])/len(queue_consumers),
-                    'score': sum([ await con.user.async_score() for con in queue_consumers ])/len(queue_consumers),
-                    'games': sum([ await con.user.async_games_count() for con in queue_consumers ])/len(queue_consumers)
-                }))
-            await asyncio.sleep(1)
+            try:
+                if self.end:
+                    break
+                    
+                if queue_consumers:
+                    await self.send(text_data=json.dumps({
+                        'type': 'queue_players_info',
+                        'count': len(queue_consumers),
+                        'winrate': sum([ await con.user.async_winrate() for con in queue_consumers ])/len(queue_consumers),
+                        'level': sum([ await con.user.async_level() for con in queue_consumers ])/len(queue_consumers),
+                        'score': sum([ await con.user.async_score() for con in queue_consumers ])/len(queue_consumers),
+                        'games': sum([ await con.user.async_games_count() for con in queue_consumers ])/len(queue_consumers)
+                    }))
+                await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                raise
 
     async def cancel(self, ban: 'User' = None):
         self.searching = True
@@ -119,3 +124,9 @@ class QueueConsumer(AsyncWebsocketConsumer):
             self.black_list.append(ban)
         elif isinstance(self.opponent, User):
             self.black_list.append(self.opponent)
+
+    def __str__(self):
+        return f'Consumer[{self.user.username}, accepted={self.ready}, clicked={self.clicked}]'
+
+    def __repr__(self):
+        return str(self)

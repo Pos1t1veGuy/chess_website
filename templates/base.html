@@ -94,6 +94,10 @@
         const maxTimeInput = document.getElementById("max-time")
 
 
+        const get_game_url = (game_id) => {
+            return `/games/${game_id}/play`
+        }
+
         const validateTimeRange = () => {
             let minTime = parseInt(minTimeInput.value)
             let maxTime = parseInt(maxTimeInput.value)
@@ -153,7 +157,18 @@
                             `,
                             showCancelButton: true,
                             confirmButtonText: 'Играть',
-                            cancelButtonText: 'Отменить'
+                            cancelButtonText: 'Отменить',
+                            preConfirm: () => {
+                                return false
+                            },
+                            willOpen: () => {
+                                const confirmButton = Swal.getConfirmButton()
+                                confirmButton.addEventListener('click', () => {
+                                    ws.send(JSON.stringify({ 'type': 'i_am_ready' }))
+                                    confirmButton.disabled = true
+                                    confirmButton.style.backgroundColor = 'gray'
+                                });
+                            }
                         }).then((result) => {
                             if (result.isConfirmed) {
                                 ws.send(JSON.stringify( {'type': 'i_am_ready'} ))
@@ -179,10 +194,8 @@
                         break
 
                     case 'game_info':
-                        console.log('opponent is ready')
-                        if (data.game_id) {
-                            
-                        }
+                        console.log('game is ready')
+                        window.location.href = get_game_url(data.game_id)
                         break
                 }
             }

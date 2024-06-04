@@ -1,12 +1,76 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шахматная доска</title>
+    <style>
+        .board {
+            display: grid;
+            grid-template-columns: repeat(8, 50px);
+            grid-template-rows: repeat(8, 50px);
+        }
 
-{% block title %}Топ игроков{% endblock %}
+        .cell {
+            width: 50px;
+            height: 50px;
+            background-color: #FFF;
+        }
 
-{% block content %}
-<style>
-    
-</style>
+        .cell.black {
+            background-color: #888;
+        }
 
+        .piece {
+            width: 100%;
+            height: 100%;
+            background-size: contain;
+        }
+    </style>
+</head>
+<body>
+    <div class="board" id="board"></div>
+    <script>
+        // Создание шахматной доски
+        function createBoard() {
+            const board = document.getElementById('board');
 
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    if ((row + col) % 2 !== 0) {
+                        cell.className += ' black';
+                    }
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    board.appendChild(cell);
+                }
+            }
+        }
 
-{% endblock %}
+        // Добавление шахматных фигур на доску (в примере только пешки)
+        function addPieces() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                const row = parseInt(cell.dataset.row);
+                if (row === 1) {
+                    const piece = document.createElement('div');
+                    piece.className = 'piece';
+                    piece.style.backgroundImage = 'url("black-pawn.png")'; // Путь к изображению пешки
+                    cell.appendChild(piece);
+                } else if (row === 6) {
+                    const piece = document.createElement('div');
+                    piece.className = 'piece';
+                    piece.style.backgroundImage = 'url("white-pawn.png")'; // Путь к изображению пешки
+                    cell.appendChild(piece);
+                }
+            });
+        }
+
+        // Вызов функций для создания доски и добавления фигур
+        createBoard();
+        addPieces();
+    </script>
+</body>
+</html>
