@@ -63,8 +63,8 @@
                     <p>Людей в очереди: <span id="queue-count">0</span></p>
                     Средняя статистика игроков:
                     <p>Сыграно матчей: <span id="games-count">0</span></p>
-                    <p>Винрейт: <span id="winrate">0</span></p>
-                    <p>Уровень: <span id="level">1</span></p>
+                    <p>Винрейт: <span id="winrate">0.0</span></p>
+                    <p>Уровень: <span id="level">0</span></p>
                     <p>Счет: <span id="score">0</span></p>
                 </div>
             {% endif %}
@@ -95,7 +95,7 @@
 
 
         const get_game_url = (game_id) => {
-            return `/games/${game_id}/play`
+            return `/games/${game_id}`
         }
 
         const validateTimeRange = () => {

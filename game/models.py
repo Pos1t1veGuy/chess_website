@@ -367,14 +367,16 @@ class Game(models.Model):
 				timedelta = 0
 
 			if self.color == 'white':
-				return self.white_player_time + timedelta
+				res = self.white_player_time + timedelta
 			else:
-				return self.black_player_time + timedelta
+				res = self.black_player_time + timedelta
 		else:
 			if self.color == 'white':
-				return self.white_player_time
+				res = self.white_player_time
 			else:
-				return self.black_player_time
+				res = self.black_player_time
+
+		return round(res, 1)
 
 	@if_not_ended
 	@if_time_is_not_up
@@ -568,6 +570,8 @@ class Game(models.Model):
 
 	def destroyed_pieces_by_color(self, color: str) -> list:
 		return [ eval(f"{piece.split(' ')[0]}('{piece.split(' ')[1]}')") for piece in self.destroyed_pieces if piece.split(' ')[1] == color ]
+	def lost_pieces_by_color(self, color: str) -> list:
+		return [ eval(f"{piece.split(' ')[0]}('{piece.split(' ')[1]}')") for piece in self.lost_pieces if piece.split(' ')[1] == color ]
 
 	@property
 	def color(self) -> str:
@@ -608,6 +612,10 @@ class Game(models.Model):
 	@property
 	def board(self) -> str:
 		return Game.board_movement(self.movements[-1])
+
+	@property
+	def players(self) -> list:
+		return [self.white_player, self.black_player]
 
 	def __getitem__(self, pos) -> list:
 		if isinstance(pos, int):

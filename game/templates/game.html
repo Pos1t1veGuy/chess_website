@@ -5,72 +5,257 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Шахматная доска</title>
     <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+
+        .main-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .board-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+        }
+
         .board {
             display: grid;
-            grid-template-columns: repeat(8, 50px);
-            grid-template-rows: repeat(8, 50px);
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            margin: 0 20px;
+            width: 80vmin;
+            height: 80vmin;
         }
 
         .cell {
-            width: 50px;
-            height: 50px;
             background-color: #FFF;
+            transition: background-color 0.15s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         .cell.black {
             background-color: #888;
         }
 
+        .cell.highlight {
+            background-color: #FFD700 !important;
+        }
+
         .piece {
-            width: 100%;
-            height: 100%;
+            width: 95%;
+            height: 95%;
             background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .players {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+            margin: 0 10px;
+        }
+
+        .player-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            border: 5px solid #000;
+            width: 200px;
+            margin-bottom: 20px;
+            border-radius: 25px;
+        }
+
+        .player-card.active {
+            border-color: #f00;
+        }
+
+        .player-avatar {
+            width: 130px;
+            height: 130px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .player-name {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .player-info {
+            font-size: 18px;
+        }
+
+        .leave-button {
+            margin: 10px 0;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .player-card {
+                width: 180px;
+            }
+            .player-avatar {
+                width: 110px;
+                height: 110px;
+                border-radius: 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .player-card {
+                width: 160px;
+            }
+            .player-avatar {
+                width: 90px;
+                height: 90px;
+                border-radius: 10px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="board" id="board"></div>
+    <div class="header">
+        <button class="leave-button" onclick="leaveGame()">Покинуть игру</button>
+    </div>
+    <div class="main-container">
+        <div class="players">
+            <div class="player-card {% if game.white_player.id == user.id %}active{% endif %}">
+                <div class="player-avatar" style="background-image: url('{{ game.white_player.avatar.url }}');"></div>
+                <div class="player-name">@{{ game.white_player.username }}</div>
+                <!--<div class="player-info">Счет: {{ ... }}</div>-->
+                <div class="player-info">Время: {{ white_player_time }} / {{ max_time }} сек</div>
+                <div class="player-info">Уровень: {{ game.white_player.level }}</div>
+                <div class="player-info">Винрейт: {{ game.white_player.winrate }}</div>
+            </div>
+        </div>
+        <div class="board-container">
+            <div class="board" id="board"></div>
+        </div>
+        <div class="players">
+            <div class="player-card {% if game.black_player.id == user.id %}active{% endif %}">
+                <div class="player-avatar" style="background-image: url('{{ game.black_player.avatar.url }}');"></div>
+                <div class="player-name">@{{ game.black_player.username }}</div>
+                <!--<div class="player-info">Счет: {{ ... }}</div>-->
+                <div class="player-info">Время: {{ black_player_time }} / {{ max_time }} сек</div>
+                <div class="player-info">Уровень: {{ game.black_player.level }}</div>
+                <div class="player-info">Винрейт: {{ game.black_player.winrate }}</div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Создание шахматной доски
-        function createBoard() {
-            const board = document.getElementById('board');
+        let selected_cell = null
+        ws = new WebSocket('ws://' + window.location.host + '/ws/game/')
+
+        ws.onopen = (event) => {
+            console.log('WebSocket is open now.')
+        }
+        ws.onclose = function(event) {
+            console.log('WebSocket is closed now.')
+        }
+
+
+        const leaveGame = () => {
+            ws.send(JSON.stringify({
+                'type': 'user_gave_up'
+            }))
+            window.location.href = "{% url 'chess:home' %}"
+        }
+
+        const createBoard = () => {
+            const board = document.getElementById('board')
+            const user_id = {{ user.id }}
+            const white_id = {{ game.white_player.id }}
+            let highlightedCell = null
 
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'cell';
-                    if ((row + col) % 2 !== 0) {
-                        cell.className += ' black';
+                    const cell = document.createElement('div')
+                    cell.className = 'cell'
+                    if (user_id === white_id) {
+                        if ((row + col) % 2 === 0) {
+                            cell.className += ' black'
+                        }
+                    } else {
+                        if ((row + col) % 2 !== 0) {
+                            cell.className += ' black'
+                        }
                     }
-                    cell.dataset.row = row;
-                    cell.dataset.col = col;
-                    board.appendChild(cell);
+                    cell.dataset.row = row
+                    cell.dataset.col = col
+                    cell.addEventListener('click', () => {
+                        if (highlightedCell) {
+                            highlightedCell.classList.remove('highlight')
+                        }
+                        cell.classList.add('highlight')
+                        highlightedCell = cell
+
+                        if (user_id === white_id) {
+                            console.log(`Row: ${cell.dataset.row}, Col: ${cell.dataset.col}`)
+                            selected_cell = [cell.dataset.row, cell.dataset.col]
+                        } else {
+                            console.log(`Row: ${Math.abs(cell.dataset.row - 7)}, Col: ${Math.abs(cell.dataset.col - 7)}`)
+                            selected_cell = [Math.abs(cell.dataset.row - 7), Math.abs(cell.dataset.col - 7)]
+                        }
+                    })
+                    board.appendChild(cell)
+                }
+            }
+
+            document.body.addEventListener('click', (e) => {
+                if (highlightedCell && !e.target.classList.contains('cell')) {
+                    highlightedCell.classList.remove('highlight')
+                    highlightedCell = null
+                }
+            }, true)
+        }
+
+        const addPieces = (boardLayout) => {
+            const cells = document.querySelectorAll('.cell')
+
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const pieceName = boardLayout[row][col].toLowerCase()
+                    if (pieceName) {
+                        const piece = document.createElement('div')
+                        piece.className = 'piece'
+                        piece.style.backgroundImage = `url("/media/pieces/${pieceName.split(' ')[1]}_${pieceName.split(' ')[0]}.png")`
+                        cells[row * 8 + col].appendChild(piece)
+                    }
                 }
             }
         }
 
-        // Добавление шахматных фигур на доску (в примере только пешки)
-        function addPieces() {
-            const cells = document.querySelectorAll('.cell');
-            cells.forEach(cell => {
-                const row = parseInt(cell.dataset.row);
-                if (row === 1) {
-                    const piece = document.createElement('div');
-                    piece.className = 'piece';
-                    piece.style.backgroundImage = 'url("black-pawn.png")'; // Путь к изображению пешки
-                    cell.appendChild(piece);
-                } else if (row === 6) {
-                    const piece = document.createElement('div');
-                    piece.className = 'piece';
-                    piece.style.backgroundImage = 'url("white-pawn.png")'; // Путь к изображению пешки
-                    cell.appendChild(piece);
-                }
-            });
-        }
-
-        // Вызов функций для создания доски и добавления фигур
-        createBoard();
-        addPieces();
+        createBoard()
     </script>
 </body>
 </html>

@@ -5,6 +5,9 @@ from asgiref.sync import sync_to_async
 import asyncio, threading, json, random
 
 
+available_games = {}
+
+
 class GameConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'game'
@@ -36,6 +39,8 @@ class GameConfig(AppConfig):
             await asyncio.sleep(1)
 
     async def start_game(self, white: 'QueueConsumer', black: 'QueueConsumer', time: int):
+        global available_games
+
         from .models import Game
         game = await sync_to_async(Game.objects.create)(white_player=white.user, black_player=black.user, max_time=time)
         await sync_to_async(game.save)()
@@ -47,6 +52,9 @@ class GameConfig(AppConfig):
                     'game_id': game.id,
                 }))
                 await con.disconnect(0)
+
+        available_games[con1.user] = game
+        available_games[con2.user] = game
 
     async def similar_players(self, user1: 'User', user2: 'User') -> bool:
         # it means values in (user.value - interval -> user.value + interval)

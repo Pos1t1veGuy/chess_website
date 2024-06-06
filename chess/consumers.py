@@ -8,6 +8,13 @@ from game.models import Game
 
 
 queue_consumers = []
+game_couple_consumers = []
+def game_consumers():
+    global game_couple_consumers
+    res = []
+    for couple in game_couple_consumers:
+        for user in couple:
+            res.append(user)
 
 
 class QueueConsumer(AsyncWebsocketConsumer):
@@ -18,24 +25,31 @@ class QueueConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
         if self.user.is_authenticated:
-            if not self.user in queue_consumers:
-                await self.add_to_queue()
+            if user.is_in_game:
+                if not self.user in queue_consumers:
+                    await self.add_to_queue()
 
-                self.searching = True
-                self.ready = False
-                self.clicked = False
-                self.opponent = None
-                self.end = False
-                self.black_list = []
+                    self.searching = True
+                    self.ready = False
+                    self.clicked = False
+                    self.opponent = None
+                    self.end = False
+                    self.black_list = []
 
-                self.min, self.max = 1, 60
+                    self.min, self.max = 1, 60
 
-                self.matchmaking_task = asyncio.create_task(self.matchmaking())
+                    self.matchmaking_task = asyncio.create_task(self.matchmaking())
 
+                else:
+                    await self.send(text_data=json.dumps({
+                        'type': 'error',
+                        'info': 'account already in queue'
+                    }))
+                    await self.close()
             else:
                 await self.send(text_data=json.dumps({
                     'type': 'error',
-                    'info': 'account already in queue'
+                    'info': 'user already in a game'
                 }))
                 await self.close()
         else:
@@ -126,7 +140,84 @@ class QueueConsumer(AsyncWebsocketConsumer):
             self.black_list.append(self.opponent)
 
     def __str__(self):
-        return f'Consumer[{self.user.username}, accepted={self.ready}, clicked={self.clicked}]'
+        return f'Queue[{self.user.username}, accepted={self.ready}, clicked={self.clicked}]'
+    def __repr__(self):
+        return str(self)
 
+
+class GameConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        global game_couple_consumers, available_games
+
+        self.user = self.scope['user']
+        await self.accept()
+
+        if self.user.is_authenticated:
+            if not self.user in game_consumers():
+                if self.user in available_games.keys():
+                    self.game = available_games[self.user]
+
+                    await self.add_to_list()
+                    await self.send(text_data=json.dumps({
+                        'type': 'pieces_info',
+                        'pieces': self.game.movements[-1]
+                    }))
+                else:
+                    await self.send(text_data=json.dumps({
+                        'type': 'error',
+                        'info': 'user has not a game'
+                    }))
+                    await self.close()
+            else:
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'info': 'account already in queue'
+                }))
+                await self.close()
+        else:
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'info': 'only registered users can play'
+            }))
+            await self.close()
+    
+    async def disconnect(self, close_code):
+        await self.remove_from_queue()
+        self.end = True
+        self.close()
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        mtype = data['type']
+        
+        match mtype:
+            case '':
+                ...
+
+    async def add_to_list(self):
+        global queue_consumers
+        
+        if self.user.is_authenticated:
+            if not self.user in [ con.user for con in queue_consumers ]:
+                queue_consumers.append(self)
+            else:
+                raise Exception('User already is in a queue')
+        else:
+            raise Exception('User is not authenticated')
+
+    async def remove_to_list(self):
+        global queue_consumers
+        
+        if self.user.is_authenticated:
+            if self in queue_consumers:
+                queue_consumers.remove(self)
+        else:
+            raise Exception('User is not authenticated')
+
+    async def cancel(self, ban: 'User' = None):
+        ...
+
+    def __str__(self):
+        return f'Game[{self.user.username}]'
     def __repr__(self):
         return str(self)

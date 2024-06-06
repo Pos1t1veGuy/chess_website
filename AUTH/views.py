@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from django.urls import reverse
+from django.urls import reverse, resolve, Resolver404
 from django.http import HttpResponse, Http404
 
 from django.contrib.auth.decorators import login_required
@@ -94,8 +94,15 @@ class login_or_register(View):
 
     def _redirect(self, request):
         if request.session.get('previous_path'):
-            path = request.session['previous_path'].split('?')[0][:-1]
-            if path in ['/account/hello', '', reverse('auth:auth')]:
+            path = request.session['previous_path'].split('?')[0]
+
+            try:
+                resolve(path)
+                path_exists = True
+            except Resolver404:
+                path_exists = False
+
+            if path in ['/account/hello', '', reverse('auth:auth')] or not path_exists:
                 return redirect('chess:home')
             else:
                 return redirect(path)
@@ -110,10 +117,7 @@ def info(request):
 @login_required(login_url='chess:home')
 def logout_view(request):
     logout(request)
-    if request.path and request.path != request.build_absolute_uri(reverse("auth:logout")):
-        return redirect(request.path)
-    else:
-        return redirect('chess:home')
+    return redirect('chess:home')
 
 def account_info(request, account_username: str):
     try:

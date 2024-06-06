@@ -100,6 +100,10 @@ class User(AbstractUser):
     def wins(self) -> int:
         return len(self.win_games)
 
+    @property
+    def is_in_game(self) -> bool:
+        return bool([ game for game in self.games if not game.ended ])
+
     @sync_to_async
     def async_username(self) -> str:
         return self.username

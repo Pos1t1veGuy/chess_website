@@ -11,7 +11,7 @@ urlpatterns = [
     path('', home, name='home'),
     path('leaders/', leaders, name='leaders'),
     path('games/', lambda request: redirect('chess:home'), name='home_redirect'),
-    path('games/<int:game_id>/', info, name='info'),
-    path('games/<int:game_id>/play', game, name='game'),
+    path('games/<int:game_id>/info/', info, name='info'),
+    path('games/<int:game_id>/', game, name='game'),
     path('hello/', hello, name='hello'),
 ]
