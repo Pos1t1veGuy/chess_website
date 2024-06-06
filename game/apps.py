@@ -5,9 +5,6 @@ from asgiref.sync import sync_to_async
 import asyncio, threading, json, random
 
 
-available_games = {}
-
-
 class GameConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'game'
@@ -39,8 +36,6 @@ class GameConfig(AppConfig):
             await asyncio.sleep(1)
 
     async def start_game(self, white: 'QueueConsumer', black: 'QueueConsumer', time: int):
-        global available_games
-
         from .models import Game
         game = await sync_to_async(Game.objects.create)(white_player=white.user, black_player=black.user, max_time=time)
         await sync_to_async(game.save)()
@@ -53,18 +48,23 @@ class GameConfig(AppConfig):
                 }))
                 await con.disconnect(0)
 
-        available_games[con1.user] = game
-        available_games[con2.user] = game
-
     async def similar_players(self, user1: 'User', user2: 'User') -> bool:
         # it means values in (user.value - interval -> user.value + interval)
         level_interval = 2
         winrate_interval = 5
         games_interval = 10
 
-        if await user1.async_level() - level_interval <= await user2.async_level() <= await user1.async_level() + level_interval:
-            if await user1.async_winrate() - winrate_interval <= await user2.async_winrate() <= await user1.async_winrate() + winrate_interval:
-                if await user1.async_games_count() - games_interval <= await user2.async_games_count() <= await user1.async_games_count() + games_interval:
+        user1_winrate = await sync_to_async(lambda: user1.winrate)()
+        user1_level = await sync_to_async(lambda: user1.winrate)()
+        user1_games_count = await sync_to_async(lambda: user1.winrate)()
+
+        user2_winrate = await sync_to_async(lambda: user2.winrate)()
+        user2_level = await sync_to_async(lambda: user2.winrate)()
+        user2_games_count = await sync_to_async(lambda: user2.winrate)()
+
+        if user1_level - level_interval <= user2_level <= user1_level + level_interval:
+            if user1_winrate - winrate_interval <= user2_winrate <= user1_winrate + winrate_interval:
+                if user1_games_count - games_interval <= user2_games_count <= user1_games_count + games_interval:
                     return True
 
         return False
@@ -79,22 +79,22 @@ class GameConfig(AppConfig):
             'type': 'game_found',
             'max_time': await self.get_mid_time(con1, con2),
             'opponent': {
-                'name': await con2.user.async_username(),
-                'winrate': await con2.user.async_winrate(),
-                'level': await con2.user.async_level(),
-                'score': await con2.user.async_score(),
-                'avatar': (await con2.user.async_avatar()).url
+                'name': await sync_to_async(lambda: con2.user.username)(),
+                'winrate': await sync_to_async(lambda: con2.user.winrate)(),
+                'level': await sync_to_async(lambda: con2.user.level)(),
+                'score': await sync_to_async(lambda: con2.user.global_score)(),
+                'avatar': (await sync_to_async(lambda: con2.user.avatar)()).url
             }
         }))
         await con2.send(text_data=json.dumps({
             'type': 'game_found',
             'max_time': await self.get_mid_time(con1, con2),
             'opponent': {
-                'name': await con1.user.async_username(),
-                'winrate': await con1.user.async_winrate(),
-                'level': await con1.user.async_level(),
-                'score': await con1.user.async_score(),
-                'avatar': (await con1.user.async_avatar()).url
+                'name': await sync_to_async(lambda: con1.user.username)(),
+                'winrate': await sync_to_async(lambda: con1.user.winrate)(),
+                'level': await sync_to_async(lambda: con1.user.level)(),
+                'score': await sync_to_async(lambda: con1.user.global_score)(),
+                'avatar': (await sync_to_async(lambda: con1.user.avatar)()).url
             }
         }))
 

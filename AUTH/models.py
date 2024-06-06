@@ -103,34 +103,3 @@ class User(AbstractUser):
     @property
     def is_in_game(self) -> bool:
         return bool([ game for game in self.games if not game.ended ])
-
-    @sync_to_async
-    def async_username(self) -> str:
-        return self.username
-    @sync_to_async
-    def async_email(self) -> str:
-        return self.email
-    @sync_to_async
-    def async_avatar(self) -> 'avatar':
-        return self.avatar
-    @sync_to_async
-    def async_level(self) -> int:
-        return self.level
-    @sync_to_async
-    def async_winrate(self) -> float:
-        return self.winrate
-    @sync_to_async
-    def async_games_count(self) -> int:
-        return self.games_count
-    @sync_to_async
-    def async_games(self) -> List['Game']:
-        return self.games
-    @sync_to_async
-    def async_wins(self) -> List['Game']:
-        return self.wins
-    @sync_to_async
-    def async_losses(self) -> List['Game']:
-        return self.losses
-    @sync_to_async
-    def async_score(self) -> int:
-        return self.global_score

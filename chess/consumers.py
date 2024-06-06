@@ -8,13 +8,6 @@ from game.models import Game
 
 
 queue_consumers = []
-game_couple_consumers = []
-def game_consumers():
-    global game_couple_consumers
-    res = []
-    for couple in game_couple_consumers:
-        for user in couple:
-            res.append(user)
 
 
 class QueueConsumer(AsyncWebsocketConsumer):
@@ -25,7 +18,7 @@ class QueueConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
         if self.user.is_authenticated:
-            if user.is_in_game:
+            if not await sync_to_async(lambda: self.user.is_in_game)():
                 if not self.user in queue_consumers:
                     await self.add_to_queue()
 
@@ -111,22 +104,22 @@ class QueueConsumer(AsyncWebsocketConsumer):
         global queue_consumers
         
         while 1:
+            if self.end:
+                break
+                
             try:
-                if self.end:
-                    break
-                    
-                if queue_consumers:
-                    await self.send(text_data=json.dumps({
-                        'type': 'queue_players_info',
-                        'count': len(queue_consumers),
-                        'winrate': sum([ await con.user.async_winrate() for con in queue_consumers ])/len(queue_consumers),
-                        'level': sum([ await con.user.async_level() for con in queue_consumers ])/len(queue_consumers),
-                        'score': sum([ await con.user.async_score() for con in queue_consumers ])/len(queue_consumers),
-                        'games': sum([ await con.user.async_games_count() for con in queue_consumers ])/len(queue_consumers)
-                    }))
-                await asyncio.sleep(1)
-            except asyncio.CancelledError:
-                raise
+                await self.send(text_data=json.dumps({
+                    'type': 'queue_players_info',
+                    'count': len(queue_consumers),
+                    'winrate': sum([ await sync_to_async(lambda: con.user.winrate)() for con in queue_consumers ])/len(queue_consumers),
+                    'level': sum([ await sync_to_async(lambda: con.user.level)() for con in queue_consumers ])/len(queue_consumers),
+                    'score': sum([ await sync_to_async(lambda: con.user.global_score)() for con in queue_consumers ])/len(queue_consumers),
+                    'games': sum([ await sync_to_async(lambda: con.user.games_count)() for con in queue_consumers ])/len(queue_consumers)
+                }))
+            except ZeroDivisionError:
+                ...
+
+            await asyncio.sleep(1)
 
     async def cancel(self, ban: 'User' = None):
         self.searching = True
@@ -147,31 +140,24 @@ class QueueConsumer(AsyncWebsocketConsumer):
 
 class GameConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        global game_couple_consumers, available_games
-
         self.user = self.scope['user']
         await self.accept()
 
         if self.user.is_authenticated:
-            if not self.user in game_consumers():
-                if self.user in available_games.keys():
-                    self.game = available_games[self.user]
+            white = await sync_to_async(Game.objects.filter)(white_player=self.user, ended=False)
+            black = await sync_to_async(Game.objects.filter)(black_player=self.user, ended=False)
+            if list(white)+list(black):
+                self.game = (list(white)+list(black))[0]
+                self.end = False
 
-                    await self.add_to_list()
-                    await self.send(text_data=json.dumps({
-                        'type': 'pieces_info',
-                        'pieces': self.game.movements[-1]
-                    }))
-                else:
-                    await self.send(text_data=json.dumps({
-                        'type': 'error',
-                        'info': 'user has not a game'
-                    }))
-                    await self.close()
+                await self.send(text_data=json.dumps({
+                    'type': 'pieces_info',
+                    'board': self.game.movements[-1]
+                }))
             else:
                 await self.send(text_data=json.dumps({
                     'type': 'error',
-                    'info': 'account already in queue'
+                    'info': 'user has not a game'
                 }))
                 await self.close()
         else:
@@ -182,7 +168,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             await self.close()
     
     async def disconnect(self, close_code):
-        await self.remove_from_queue()
+        await self.remove_from_list()
         self.end = True
         self.close()
 
@@ -191,30 +177,10 @@ class GameConsumer(AsyncWebsocketConsumer):
         mtype = data['type']
         
         match mtype:
-            case '':
-                ...
+            case 'user_gave_up':
+                await self.gave_up()
 
-    async def add_to_list(self):
-        global queue_consumers
-        
-        if self.user.is_authenticated:
-            if not self.user in [ con.user for con in queue_consumers ]:
-                queue_consumers.append(self)
-            else:
-                raise Exception('User already is in a queue')
-        else:
-            raise Exception('User is not authenticated')
-
-    async def remove_to_list(self):
-        global queue_consumers
-        
-        if self.user.is_authenticated:
-            if self in queue_consumers:
-                queue_consumers.remove(self)
-        else:
-            raise Exception('User is not authenticated')
-
-    async def cancel(self, ban: 'User' = None):
+    async def give_up(self):
         ...
 
     def __str__(self):

@@ -183,6 +183,17 @@
             console.log('WebSocket is closed now.')
         }
 
+         ws.onmessage = function(event) {
+            console.log('message is received ' + event.data)
+            const data = JSON.parse(event.data)
+
+            switch (data.type) {
+                case 'pieces_info':
+                    addPieces(data.board) 
+                    break
+            }
+        }
+
 
         const leaveGame = () => {
             ws.send(JSON.stringify({
@@ -241,6 +252,9 @@
 
         const addPieces = (boardLayout) => {
             const cells = document.querySelectorAll('.cell')
+            const user_id = {{ user.id }}
+            const white_id = {{ game.white_player.id }}
+            const mirrored = user_id !== white_id
 
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
@@ -249,7 +263,9 @@
                         const piece = document.createElement('div')
                         piece.className = 'piece'
                         piece.style.backgroundImage = `url("/media/pieces/${pieceName.split(' ')[1]}_${pieceName.split(' ')[0]}.png")`
-                        cells[row * 8 + col].appendChild(piece)
+                        
+                        const targetRow = mirrored ? 7 - row : row
+                        cells[targetRow * 8 + col].appendChild(piece)
                     }
                 }
             }
