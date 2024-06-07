@@ -5,6 +5,7 @@ from asgiref.sync import sync_to_async
 
 from AUTH.models import User
 from game.models import Game
+from game.pieces import string_pieces
 
 
 queue_consumers = []
@@ -154,7 +155,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                 self.color = await sync_to_async(self.game.get_color_by_user)(self.user)
                 self.opponent = await sync_to_async(self.game.get_opponent_user)(self.user)
 
-                await self.send_opponent(json.dumps( {'type':'opponent_is_connected'} ))
+                await self.send_opponent({'type':'opponent_is_connected'})
                 await self.send(text_data=json.dumps({
                     'type': 'pieces_info',
                     'board': self.game.movements[-1]
@@ -184,8 +185,44 @@ class GameConsumer(AsyncWebsocketConsumer):
         
         match mtype:
             case 'user_gave_up':
-                self.game.give_up(self.game.get_color_by_user(self.user))
-                self.lose()
+                await self.game.give_up(self.game.get_color_by_user(self.user))
+                await self.lose()
+            case 'movement':
+                if 'from' in data.keys() and 'to' in data.keys():
+                    if len(data['from']) == 2 and all([ isisnstance(num, int) for num in data['from'] ]):
+                        piece = await sync_to_async(self.game.get_piece)(data['from'])
+                        if piece:
+                            if piece.color == self.color:
+                                await self.send(text_data=(await sync_to_async(self.game.move)(data['from'], data['to'], return_json=True)))
+                            else:
+                                await self.send(text_data={
+                                    'type': f"Ты не можешь двигать чужие { 'белые' if self.color == 'white' else 'черные' } фигуры"
+                                })
+                        else:
+                            await self.send(text_data={'type': f"Некорректно указана позиция фигуры"})
+                    else:
+                        await self.send(text_data={'type': f"Некорректно указана позиция фигуры"})
+
+            case 'transform_pawn':
+                if 'position' in data.keys() and 'to' in data.keys():
+                    if len(data['position']) == 2 and all([ isisnstance(num, int) for num in data['position'] ]):
+                        piece = await sync_to_async(self.game.get_piece)(data['position'])
+                        if piece:
+                            if piece.color == self.color:
+                                if data['to'] in string_pieces.lower():
+                                    await self.send(text_data=(await sync_to_async(self.game.transform_pawn)(data['position'], data['to'], return_json=True)))
+                                else:
+                                    await self.send(text_data={
+                                        'type': "Указана неправильная фигура, в которую будет превращена клетка"
+                                    })
+                            else:
+                                await self.send(text_data={
+                                    'type': f"Ты не можешь двигать чужие { 'белые' if self.color == 'white' else 'черные' } фигуры"
+                                })
+                        else:
+                            await self.send(text_data={'type': f"Некорректно указана позиция фигуры"})
+                    else:
+                        await self.send(text_data={'type': f"Некорректно указана позиция фигуры"})
 
     async def command_queue(self):
         global game_consumers_queue
@@ -196,7 +233,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             
             if self.user in game_consumers_msgs.keys():
                 for msg in game_consumers_msgs[self.user]:
-                    await self.send(text_data=msg)
+                    await self.send(text_data=json.dumps(msg))
                     if msg['type'] == 'opponent_gived_up':
                         await self.win()
                     game_consumers_msgs[self.user].remove(msg)
@@ -215,7 +252,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'game_is_losed'
         }))
-        await self.send_opponent(json.dumps( {'type':'opponent_gived_up'} ))
+        await self.send_opponent({'type':'opponent_gived_up'})
         await self.disconnect(0)
     async def win(self):
         await self.send(text_data=json.dumps({

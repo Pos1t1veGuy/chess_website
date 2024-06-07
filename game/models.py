@@ -122,12 +122,9 @@ class Game(models.Model):
 		super().__init__(*args, **kwargs)
 		self.actions = [self.move, self.castling, self.transform_pawn]
 
-		if 'pk' in kwargs:
-			... # if it is a new object
-
 	@if_not_ended_and_started
 	@if_time_is_not_up
-	def move(self, _from: list, _to: list, predict_score: bool = False, start_score: int = 100):
+	def move(self, _from: list, _to: list, predict_score: bool = False, start_score: int = 100, return_json: bool = False):
 		player_color = self.color
 
 		movements = self.soft_movements
@@ -144,6 +141,19 @@ class Game(models.Model):
 		if len(save_king_movements) == 0:
 			self.end(win='black' if player_color == 'white' else 'white', res='checkmate')
 
+		for i, fromto in enumerate([_from, _to]):
+			if isinstance(fromto, list):
+				if len(fromto) == 2:
+					if isisnstance(fromto[0], int) and isisnstance(fromto[1], int):
+						if 0 <= fromto[0] <= 7 and 0 <= fromto[1] <= 7:
+							continue
+
+			if not return_json_err:
+				raise ValueError(f"Position {['from', 'to'][i]} is invalid: {fromto}")
+			else:
+				return {'type': f"Некорректно указана позиция {['фигуры', 'перемещения'][i]}"}
+
+
 		if isinstance(last_movement[_from[1]][_from[0]], Piece):
 			if last_movement[_from[1]][_from[0]].color == player_color: # everything has its time
 				destroyed_piece = last_movement[_to[1]][_to[0]] if isinstance(last_movement[_to[1]][_to[0]], Piece) else None
@@ -154,37 +164,61 @@ class Game(models.Model):
 						self.update_time()
 						self.set_scores(new_movement, player_color, start_score, destroyed_piece, transformed_pawn=False)
 						self.save_movement(new_movement)
+						if return_json:
+							return {'type': "success"}
 					else:
 						return self.get_movement_score(new_movement, player_color, start_score, destroyed_piece, transformed_pawn=False)
 				else:
 					formatted_save_movements = '\n'.join([
 						f'{i+1}. [{movement[0]} -> {movement[1]}]' for i, movement in enumerate(save_king_movements)
 					])
-					raise ValueError(f"Your king is in danger! You must safe king. To do it, you have this movements:\n{formatted_save_movements}")
+					if not return_json:
+						raise ValueError(f"Your king is in danger! You must safe king. To do it, you have this movements:\n{formatted_save_movements}")
+					else:
+						return {'type': "Королю объявлен шах, ты должен защитить короля", 'movements': save_king_movements}
 			
 			else:
-				raise ValueError(f"{len(self.movements)} movement is for {player_color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
+				if not return_json:
+					raise ValueError(f"{len(self.movements)} movement is for {player_color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
+				else:
+					return {'type': "Этот ход предназначается сопернику"}
 		else:
-			raise ValueError("Position '_from' at last game move is empty, there must be piece to move it")
+			if not return_json:
+				raise ValueError("Position '_from' at last game move is empty or not on board, there must be piece to move it")
+			else:
+				return {'type': "Выбрана позиция на доске, которая либо не существует, либо пустая, здесь должна быть фигура"}
 
 	@if_not_ended_and_started
 	@if_time_is_not_up
-	def transform_pawn(self, pos_or_pawn, to: Piece, predict_score: bool = False, start_score: int = 100):
+	def transform_pawn(self, pos_or_pawn, to: Piece, predict_score: bool = False, start_score: int = 100, return_json: bool = False):
 		if isinstance(pos_or_pawn, (list, tuple)):
 			if len(pos_or_pawn) == 2:
 				if isinstance(self[pawn_pos], Pawn):
 					obj = self[pawn_pos]
 				else:
-					raise ValueError(f'Not Pawn at position {pos_or_pawn}')
+					if not return_json:
+						raise ValueError(f'Not Pawn at position {pos_or_pawn}')
+					else:
+						return {'type': "На указанной позиции нет пешки"}
 			else:
-				raise ValueError(f'Invalid position {pos_or_pawn}. Position must be list/tuple with 2 integer values')
+				if not return_json:
+					raise ValueError(f'Invalid position {pos_or_pawn}. Position must be list/tuple with 2 integer values')
+				else:
+					return {'type': "Неправильная позиция"}
+
 		if isinstance(pos_or_pawn, Pawn):
 			if self[pos_or_pawn.pos] == Pawn:
 				obj = pos_or_pawn
 			else:
-				raise ValueError(f'Argument {pos_or_pawn} with pos {pos_or_pawn.pos} is not in this game. It must be at last movement ( game.soft_movements[-1] to get it )')
+				if not return_json:
+					raise ValueError(f'Argument {pos_or_pawn} with pos {pos_or_pawn.pos} is not in this game. It must be at last movement ( game.soft_movements[-1] to get it )')
+				else:
+					return {'type': "Пешка не находится в этой игре"}
 		else:
-			raise ValueError(f'Invalid argument {pos_or_pawn}. It must be position (list/tuple with 2 integer values) or Pawn object')
+			if not return_json:
+				raise ValueError(f'Invalid argument {pos_or_pawn}. It must be position (list/tuple with 2 integer values) or Pawn object')
+			else:
+				return {'type': "Неправильная позиция или пешка"}
 
 		if isinstance(to, Piece) and not isinstance(to, (Pawn, King)):
 			last_movement = self.soft_movements[-1]
@@ -196,6 +230,8 @@ class Game(models.Model):
 						self.update_time()
 						self.set_scores(last_movement, self.color, start_score, [], transformed_pawn=True)
 						self.save_movement(last_movement)
+						if return_json:
+							return {'type': "success"}
 					else:
 						return self.get_movement_score(last_movement, self.color, start_score, [], transformed_pawn=True)
 
@@ -206,32 +242,55 @@ class Game(models.Model):
 						self.update_time()
 						self.set_scores(last_movement, self.color, start_score, [], transformed_pawn=True)
 						self.save_movement(last_movement)
+						if return_json:
+							return {'type': "success"}
 					else:
 						return self.get_movement_score(last_movement, self.color, start_score, [], transformed_pawn=True)
 
 				else:
-					raise ValueError(f'{str(obj)} at {obj.pos} can not be transformated')
+					if not return_json:
+						raise ValueError(f'{str(obj)} at {obj.pos} can not be transformated')
+					else:
+						return {'type': "Фигура не моежт быть трансформирована"}
 			else:
-				raise ValueError(f"{len(self.movements)} movement is for {self.color}, but this Pawn is a {obj.color}")
+				if not return_json:
+					raise ValueError(f"{len(self.movements)} movement is for {self.color}, but this Pawn is a {obj.color}")
+				else:
+					return {'type': "Этот ход предназначается сопернику"}
 		else:
-			raise ValueError(f'Invalid argument {to}. It must be Piece object ( not Pawn )')
-
-	def give_up(self, color: str):
-		if color == 'white':
-			self.end(win=self.black_player, res='gived_up')
-		elif color == 'black':
-			self.end(win=self.white_player, res='gived_up')
-		else:
-			raise ValueError(f'give_up takes a string, that means losser color, black or white')
+			if not return_json:
+				raise ValueError(f'Invalid argument {to}. It must be Piece object ( not Pawn )')
+			else:
+				return {'type': "Указана неправильная фигура для трансформации"}
 
 	@if_not_ended_and_started
 	@if_time_is_not_up
-	def castling(self, color: str, side: str, predict_score: bool = False, start_score: int = 100):
+	def give_up(self, color: str, return_json: bool = False):
+		if color == 'white':
+			self.end(win=self.black_player, res='gived_up')
+			if return_json:
+				return {'type': "success"}
+		elif color == 'black':
+			self.end(win=self.white_player, res='gived_up')
+			if return_json:
+				return {'type': "success"}
+		else:
+			if not return_json:
+				raise ValueError(f'give_up takes a string, that means losser color, black or white')
+			else:
+				return {'type': "Указан неверный цвет"}
+
+	@if_not_ended_and_started
+	@if_time_is_not_up
+	def castling(self, color: str, side: str, predict_score: bool = False, start_score: int = 100, return_json: bool = False):
 		if side in ['left', 'right']: # 1 - left, 0 - right
 			side = 1 if side == 'left' else 0
 			side = not side if self.color == 'black' else side
 		else:
-			raise ValueError(f'Invalid argument {side}. It must be "left"/"right" ( if it is for black player it will be mirrored )')
+			if not return_json:
+				raise ValueError(f'Invalid argument {side}. It must be "left"/"right" ( if it is for black player it will be mirrored )')
+			else:
+				return {'type': "Указано неверное направление, оно должно быть left или right ( для игрока на черных направление отзеркаливается )"}
 
 		if color == self.color: # everything has its time
 			kings = [ piece for piece in self.alive_pieces if isinstance(piece, King) ]
@@ -278,13 +337,23 @@ class Game(models.Model):
 					self.update_time()
 					self.set_scores(new_movement, self.color, start_score, [], transformed_pawn=False)
 					self.save_movement(new_movement)
+					if return_json:
+						return {'type': "success"}
 				else:
 					return self.get_movement_score(new_movement, self.color, start_score, [], transformed_pawn=False)
+					if return_json:
+						return {'type': "success"}
 
 			else:
-				raise ValueError(f"You can not make castling because you are already moved 2 rooks or 1 rook & king")
+				if not return_json:
+					raise ValueError(f"You can not make castling because you are already moved 2 rooks or 1 rook & king")
+				else:
+					return {'type': "Рокировка невозможна, так как либо король, либо ладьи были сдвинуты"}
 		else:
-			raise ValueError(f"{len(self.movements)} movement is for {self.color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
+			if not return_json:
+				raise ValueError(f"{len(self.movements)} movement is for {self.color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
+			else:
+				return {'type': "Этот ход предназначается сопернику"}
 
 	def make_movement(self, last_movement: list, _from: list, _to: list, reg_destroyed_pieces: bool = False) -> list:
 		# sets position to piece and will destroy enemy piece if it is at TO position and checks kings

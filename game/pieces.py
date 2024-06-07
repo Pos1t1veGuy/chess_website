@@ -5,7 +5,14 @@ def pos_at_board(pos: list) -> bool:
 	
 	raise ValueError(f"'pos' must contain only 2 int from 0 to 7, not {pos}")
 
-class Piece:
+
+class PieceMeta(type):
+	def __str__(cls):
+		return cls.__name__
+	def __repr__(cls):
+		return f'<{cls.__name__}>'
+
+class Piece(metaclass=PieceMeta):
 	def __init__(self, color: str, pos: list = [0,0]):
 		self.price = 1
 		if color in ['black', 'white']:
@@ -317,3 +324,6 @@ class King(Piece):
 	@property
 	def checkmate(self):
 		return self.check and self.mate
+
+pieces = [Pawn, Rook, Bishop, Knight, King, Queen]
+string_pieces = [ str(piece) for piece in pieces ]
