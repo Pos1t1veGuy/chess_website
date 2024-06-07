@@ -216,6 +216,14 @@ class Game(models.Model):
 		else:
 			raise ValueError(f'Invalid argument {to}. It must be Piece object ( not Pawn )')
 
+	def give_up(self, color: str):
+		if color == 'white':
+			self.end(win=self.black_player, res='gived_up')
+		elif color == 'black':
+			self.end(win=self.white_player, res='gived_up')
+		else:
+			raise ValueError(f'give_up takes a string, that means losser color, black or white')
+
 	@if_not_ended_and_started
 	@if_time_is_not_up
 	def castling(self, color: str, side: str, predict_score: bool = False, start_score: int = 100):
@@ -433,6 +441,24 @@ class Game(models.Model):
 		self.black_player.global_score += self.black_player_score
 		self.end_reason = reason
 		self.ended = True
+
+	def get_color_by_user(self, user: 'User') -> str:
+		if self.white_player == user:
+			return 'white'
+		elif self.black_player == user:
+			return 'black'
+
+	def get_user_by_user(self, color: str) -> 'User':
+		if color == 'white':
+			return self.white_player
+		elif color == 'black':
+			return self.black_player
+
+	def get_opponent_user(self, user: 'User') -> 'User':
+		if user == self.white_player:
+			return self.black_player
+		elif user == self.black_player:
+			return self.white_player
 
 	def get_movement_score(self, movement: list, player: str, start_score: int, destoyed_enemy_piece: list, transformed_pawn: bool = False):
 		'''

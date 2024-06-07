@@ -8,6 +8,7 @@ from game.models import Game
 
 
 queue_consumers = []
+game_consumers_msgs = {}
 
 
 class QueueConsumer(AsyncWebsocketConsumer):
@@ -146,14 +147,20 @@ class GameConsumer(AsyncWebsocketConsumer):
         if self.user.is_authenticated:
             white = await sync_to_async(Game.objects.filter)(white_player=self.user, ended=False)
             black = await sync_to_async(Game.objects.filter)(black_player=self.user, ended=False)
-            if list(white)+list(black):
-                self.game = (list(white)+list(black))[0]
+            if await sync_to_async(list)(white) + await sync_to_async(list)(black):
+                self.game = (await sync_to_async(list)(white) + await sync_to_async(list)(black))[0]
                 self.end = False
 
+                self.color = await sync_to_async(self.game.get_color_by_user)(self.user)
+                self.opponent = await sync_to_async(self.game.get_opponent_user)(self.user)
+
+                await self.send_opponent(json.dumps( {'type':'opponent_is_connected'} ))
                 await self.send(text_data=json.dumps({
                     'type': 'pieces_info',
                     'board': self.game.movements[-1]
                 }))
+
+                self.command_queue_task = asyncio.create_task(self.command_queue())
             else:
                 await self.send(text_data=json.dumps({
                     'type': 'error',
@@ -168,7 +175,6 @@ class GameConsumer(AsyncWebsocketConsumer):
             await self.close()
     
     async def disconnect(self, close_code):
-        await self.remove_from_list()
         self.end = True
         self.close()
 
@@ -178,10 +184,44 @@ class GameConsumer(AsyncWebsocketConsumer):
         
         match mtype:
             case 'user_gave_up':
-                await self.gave_up()
+                self.game.give_up(self.game.get_color_by_user(self.user))
+                self.lose()
 
-    async def give_up(self):
-        ...
+    async def command_queue(self):
+        global game_consumers_queue
+        
+        while 1:
+            if self.end:
+                break
+            
+            if self.user in game_consumers_msgs.keys():
+                for msg in game_consumers_msgs[self.user]:
+                    await self.send(text_data=msg)
+                    if msg['type'] == 'opponent_gived_up':
+                        await self.win()
+                    game_consumers_msgs[self.user].remove(msg)
+            
+            await asyncio.sleep(.5)
+
+    async def send_opponent(self, data: dict):
+        global game_consumers_msgs
+
+        if self.opponent in game_consumers_msgs.keys():
+            game_consumers_msgs[self.opponent].append(data)
+        else:
+            game_consumers_msgs = [data]
+
+    async def lose(self):
+        await self.send(text_data=json.dumps({
+            'type': 'game_is_losed'
+        }))
+        await self.send_opponent(json.dumps( {'type':'opponent_gived_up'} ))
+        await self.disconnect(0)
+    async def win(self):
+        await self.send(text_data=json.dumps({
+            'type': 'game_is_won'
+        }))
+        await self.disconnect(0)
 
     def __str__(self):
         return f'Game[{self.user.username}]'
