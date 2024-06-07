@@ -222,7 +222,7 @@ class Game(models.Model):
 
 		if isinstance(to, Piece) and not isinstance(to, (Pawn, King)):
 			last_movement = self.soft_movements[-1]
-			if self.color == obj.color:
+			if self.color == obj.color: # everything has its time
 				if obj.color == 'white' and obj.pos[1] in [0, 1]:
 
 					last_movement[obj.x][0] = to(obj.color, pos=[obj.x][0])

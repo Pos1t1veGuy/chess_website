@@ -310,19 +310,36 @@ class King(Piece):
 			[self.pos[0]-1, self.pos[1]+1],
 		] if pos_at_board(pos) and not pos in enemy_positions + friend_positions]
 
+		white_castlings = [[2,0], [6,0]]
+		black_castlings = [[2,7], [6,7]]
+
+		rooks_positions = [ rook.pos for rook in self.friends if isinstance(rook, Rook) and not rook.moved ]
+
+		if self.color == 'white' and not self.moved:
+			if [0, 0] in rooks_positions and not [0, 0] in enemy_positions + friend_positions:
+				movable_to += white_castlings[0]
+			if [7, 0] in rooks_positions and not [7, 0] in enemy_positions + friend_positions:
+				movable_to += white_castlings[1]
+		elif self.color == 'black' and not self.moved:
+			if [0, 7] in rooks_positions and not [0, 7] in enemy_positions + friend_positions:
+				movable_to += black_castlings[0]
+			if [7, 7] in rooks_positions and not [7, 7] in enemy_positions + friend_positions:
+				movable_to += black_castlings[1]
+
+
 		self.mate = len(movable_to) == 0
 		return movable_to
 
-	def check(self, enemies: list = [], friends: list = []):
+	def check(self, enemies: list = [], friends: list = []) -> bool:
 		return self.pos in [ piece.movable_to for piece in enemies ]
-	def mate(self, enemies: list = [], friends: list = []):
+	def mate(self, enemies: list = [], friends: list = []) -> bool:
 		return len(self.movable_to(enemies=enemies, friends=friends)) == 0
 
 	def check_enemies(self, enemies: list = [], friends: list = []):
 		return [ piece for piece in enemies if self.pos in piece.movable_to(friends, enemies) ]
 
 	@property
-	def checkmate(self):
+	def checkmate(self) -> bool:
 		return self.check and self.mate
 
 pieces = [Pawn, Rook, Bishop, Knight, King, Queen]

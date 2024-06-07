@@ -174,6 +174,9 @@
 
     <script>
         let selected_cell = null
+        let is_cell_empty = true
+        let last_piece = null
+
         ws = new WebSocket('ws://' + window.location.host + '/ws/game/')
 
         ws.onopen = (event) => {
@@ -199,7 +202,6 @@
             ws.send(JSON.stringify({
                 'type': 'user_gave_up'
             }))
-            window.location.href = "{% url 'chess:home' %}"
         }
 
         const createBoard = () => {
@@ -230,11 +232,20 @@
                         cell.classList.add('highlight')
                         highlightedCell = cell
 
+                        if (!is_cell_empty && cell.children.length === 0 && selected_cell !== [cell.dataset.row, cell.dataset.col] && last_piece) {
+                            const color = last_piece.dataset.color
+                            const type = last_piece.dataset.type
+                            console.log(`Клетка занята: Row: ${cell.dataset.row}, Col: ${cell.dataset.col}, Фигура: ${color} ${type}`)
+                        }
+
+                        is_cell_empty = cell.children.length === 0
+                        if (!is_cell_empty) {
+                            last_piece = cell.children[0]
+                        }
+
                         if (user_id === white_id) {
-                            console.log(`Row: ${cell.dataset.row}, Col: ${cell.dataset.col}`)
                             selected_cell = [cell.dataset.row, cell.dataset.col]
                         } else {
-                            console.log(`Row: ${Math.abs(cell.dataset.row - 7)}, Col: ${Math.abs(cell.dataset.col - 7)}`)
                             selected_cell = [Math.abs(cell.dataset.row - 7), Math.abs(cell.dataset.col - 7)]
                         }
                     })
@@ -264,6 +275,9 @@
                         piece.className = 'piece'
                         piece.style.backgroundImage = `url("/media/pieces/${pieceName.split(' ')[1]}_${pieceName.split(' ')[0]}.png")`
                         
+                        piece.dataset.color = pieceName.split(' ')[1]
+                        piece.dataset.type = pieceName.split(' ')[0]
+
                         const targetRow = mirrored ? 7 - row : row
                         cells[targetRow * 8 + col].appendChild(piece)
                     }
