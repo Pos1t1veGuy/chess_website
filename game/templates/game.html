@@ -63,6 +63,10 @@
             background-color: #FFD700 !important;
         }
 
+        .cell.available {
+            background-color: #32CD32 !important;
+        }
+
         .piece {
             width: 95%;
             height: 95%;
@@ -176,6 +180,8 @@
         let selected_cell = null
         let is_cell_empty = true
         let last_piece = null
+        let last_piece_color = null
+        let highlightedCells = []
 
         ws = new WebSocket('ws://' + window.location.host + '/ws/game/')
 
@@ -186,14 +192,28 @@
             console.log('WebSocket is closed now.')
         }
 
-         ws.onmessage = function(event) {
-            console.log('message is received ' + event.data)
+        ws.onmessage = function(event) {
             const data = JSON.parse(event.data)
+            console.log('message is received ' + decodeUTF8(data.type))
 
             switch (data.type) {
                 case 'pieces_info':
                     addPieces(data.board) 
                     break
+                case 'available_positions':
+                    highlight_positions(data.movements)
+                    break
+            }
+        }
+
+        function decodeUTF8(input) {
+            try {
+                const decoder = new TextDecoder('utf-8');
+                const uint8Array = new Uint8Array(input.split('').map(char => char.charCodeAt(0)));
+                return decoder.decode(uint8Array);
+            } catch (e) {
+                console.error('Error decoding UTF-8 string:', e);
+                return input;
             }
         }
 
@@ -210,21 +230,27 @@
             const white_id = {{ game.white_player.id }}
             let highlightedCell = null
 
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
+            if (user_id === white_id) {
+                color = 'white'
+            } else {
+                color = 'black'
+            }
+
+            for (let x = 0; x < 8; x++) {
+                for (let y = 0; y < 8; y++) {
                     const cell = document.createElement('div')
                     cell.className = 'cell'
-                    if (user_id === white_id) {
-                        if ((row + col) % 2 === 0) {
+                    if (color === 'white') {
+                        if ((x + y) % 2 === 0) {
                             cell.className += ' black'
                         }
                     } else {
-                        if ((row + col) % 2 !== 0) {
+                        if ((x + y) % 2 !== 0) {
                             cell.className += ' black'
                         }
                     }
-                    cell.dataset.row = row
-                    cell.dataset.col = col
+                    cell.dataset.x = x
+                    cell.dataset.y = y
                     cell.addEventListener('click', () => {
                         if (highlightedCell) {
                             highlightedCell.classList.remove('highlight')
@@ -232,21 +258,32 @@
                         cell.classList.add('highlight')
                         highlightedCell = cell
 
-                        if (!is_cell_empty && cell.children.length === 0 && selected_cell !== [cell.dataset.row, cell.dataset.col] && last_piece) {
-                            const color = last_piece.dataset.color
-                            const type = last_piece.dataset.type
-                            console.log(`Клетка занята: Row: ${cell.dataset.row}, Col: ${cell.dataset.col}, Фигура: ${color} ${type}`)
+                        if (!is_cell_empty && cell.children.length === 0 && selected_cell !== [cell.dataset.x, cell.dataset.y] && last_piece) {
+                            if (color === last_piece.dataset.color) {
+                                ws.send(JSON.stringify({
+                                    'type': 'movement',
+                                    'from': selected_cell,
+                                    'to': [cell.dataset.x, cell.dataset.y],
+                                }))
+                                console.log(`Ход с клетки ${selected_cell} до клетки [${cell.dataset.x}, ${cell.dataset.y}], Фигура: ${last_piece.dataset.color} ${last_piece.dataset.type}`)
+                            }
+                        } else if ((!is_cell_empty && last_piece_color === color) || is_cell_empty) {
+                            ws.send(JSON.stringify({
+                                'type': 'get_available_movements',
+                                'position': [cell.dataset.x, cell.dataset.y],
+                            }))
                         }
 
                         is_cell_empty = cell.children.length === 0
                         if (!is_cell_empty) {
                             last_piece = cell.children[0]
+                            last_piece_color = last_piece.dataset.color
                         }
 
-                        if (user_id === white_id) {
-                            selected_cell = [cell.dataset.row, cell.dataset.col]
+                        if (color === 'white') {
+                            selected_cell = [cell.dataset.x, cell.dataset.y]
                         } else {
-                            selected_cell = [Math.abs(cell.dataset.row - 7), Math.abs(cell.dataset.col - 7)]
+                            selected_cell = [Math.abs(cell.dataset.x - 7), Math.abs(cell.dataset.y - 7)]
                         }
                     })
                     board.appendChild(cell)
@@ -257,6 +294,7 @@
                 if (highlightedCell && !e.target.classList.contains('cell')) {
                     highlightedCell.classList.remove('highlight')
                     highlightedCell = null
+                    clear_highlighted()
                 }
             }, true)
         }
@@ -267,9 +305,9 @@
             const white_id = {{ game.white_player.id }}
             const mirrored = user_id !== white_id
 
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    const pieceName = boardLayout[row][col].toLowerCase()
+            for (let x = 0; x < 8; x++) {
+                for (let y = 0; y < 8; y++) {
+                    const pieceName = boardLayout[x][y].toLowerCase()
                     if (pieceName) {
                         const piece = document.createElement('div')
                         piece.className = 'piece'
@@ -277,12 +315,32 @@
                         
                         piece.dataset.color = pieceName.split(' ')[1]
                         piece.dataset.type = pieceName.split(' ')[0]
+                        piece.dataset.x = x
+                        piece.dataset.y = y
 
-                        const targetRow = mirrored ? 7 - row : row
-                        cells[targetRow * 8 + col].appendChild(piece)
+                        const targetX = mirrored ? 7 - x : x
+                        cells[targetX * 8 + y].appendChild(piece)
                     }
                 }
             }
+        }
+
+        const highlight_positions = (movements) => {
+            clear_highlighted() // Очистить предыдущие подсветки
+            movements.forEach(([x, y]) => {
+                const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`)
+                if (cell) {
+                    cell.classList.add('available')
+                    highlightedCells.push(cell) // Добавить в список подсвеченных клеток
+                }
+            });
+        };
+
+        const clear_highlighted = () => {
+            highlightedCells.forEach(cell => {
+                cell.classList.remove('available')
+            })
+            highlightedCells = []
         }
 
         createBoard()

@@ -400,11 +400,26 @@ class Game(models.Model):
 		self.last_movement_time = timezone.now()
 		self.save()
 
-	def piece_movable_to(self, piece):
-		movable_to = piece.movable_to(
-			enemies=self.black_pieces if piece.color == 'white' else self.white_pieces,
-			friends=self.black_pieces if piece.color == 'black' else self.white_pieces
-		)
+	def piece_movable_to(self, piece: 'Piece'):
+		if isinstance(piece, Piece):
+			movable_to = piece.movable_to(
+				enemies=self.black_pieces if piece.color == 'white' else self.white_pieces,
+				friends=self.black_pieces if piece.color == 'black' else self.white_pieces
+			)
+		elif isinstance(piece, (list, tuple)):
+			if len(piece) == 2 and all([ isinstance(num, int) for num in piece ]):
+				if all([ 0 <= num <= 7 for num in piece ]):
+					movable_to = piece.movable_to(
+						enemies=self.black_pieces if piece.color == 'white' else self.white_pieces,
+						friends=self.black_pieces if piece.color == 'black' else self.white_pieces
+					)
+				else:
+					raise ValueError(f'piece_movable_to takes Piece object or list with board position, not {piece}')
+			else:
+				raise ValueError(f'piece_movable_to takes Piece object or list with board position, not {piece}')
+		else:
+			raise ValueError(f'piece_movable_to takes Piece object or list with board position, not {piece}')
+			
 		return set([ tuple(pos) for pos in movable_to ]) & set(self.all_pieces_movements(color=piece.color))
 
 	def piece_set_pos(self, _from: list, _to: list, movement: list = None, save: bool = False):
