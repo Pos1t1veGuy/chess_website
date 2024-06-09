@@ -194,10 +194,10 @@ class GameConsumer(AsyncWebsocketConsumer):
                                 if piece:
                                     print(piece, self.color)
                                     if piece.color == self.color:
-                                        try:
-                                            res = await sync_to_async(self.game.piece_movable_to)(pos)
-                                        except Exception as e:
-                                            res = {'type': str(e)}
+                                        #try:
+                                        res = await sync_to_async(self.game.piece_movable_to)(pos)
+                                        #except Exception as e:
+                                            #res = {'type': str(e)}
 
                                         await self.send(text_data=json.dumps({
                                             'type': 'available_positions',

@@ -313,7 +313,7 @@ class King(Piece):
 		white_castlings = [[2,0], [6,0]]
 		black_castlings = [[2,7], [6,7]]
 
-		rooks_positions = [ rook.pos for rook in self.friends if isinstance(rook, Rook) and not rook.moved ]
+		rooks_positions = [ rook.pos for rook in friends if isinstance(rook, Rook) and not rook.moved ]
 
 		if self.color == 'white' and not self.moved:
 			if [0, 0] in rooks_positions and not [0, 0] in enemy_positions + friend_positions:

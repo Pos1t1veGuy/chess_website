@@ -134,7 +134,7 @@ class Game(models.Model):
 		else:
 			raise ValueError("Position '_from' at last game move is empty or not on board, there must be piece to move it")
 
-		all_movements = self.all_pieces_movements()
+		all_movements = self.all_pieces_movements(player_color)
 		save_king_movements = []
 		for __from, __to in all_movements:
 			movement = self.make_movement(deepcopy(last_movement), __from, __to)
@@ -252,7 +252,7 @@ class Game(models.Model):
 				raise ValueError("The game is ended")
 			if not self.playing:
 				raise ValueError("The game is not started")
-			
+
 			kings = [ piece for piece in self.alive_pieces if isinstance(piece, King) ]
 			king = [ king for king in kings if king.color == color ][0]
 			rooks = [ rook for rook in [ piece for piece in self.alive_pieces if isinstance(piece, Rook) ] if rook.color == color ]
@@ -359,10 +359,7 @@ class Game(models.Model):
 		elif isinstance(piece, (list, tuple)):
 			if len(piece) == 2 and all([ isinstance(num, int) for num in piece ]):
 				if all([ 0 <= num <= 7 for num in piece ]):
-					movable_to = piece.movable_to(
-						enemies=self.black_pieces if piece.color == 'white' else self.white_pieces,
-						friends=self.black_pieces if piece.color == 'black' else self.white_pieces
-					)
+					return self.piece_movable_to(self[piece])
 				else:
 					raise ValueError(f'piece_movable_to takes Piece object or list with board position, not {piece}')
 			else:
@@ -370,7 +367,8 @@ class Game(models.Model):
 		else:
 			raise ValueError(f'piece_movable_to takes Piece object or list with board position, not {piece}')
 
-		return set([ tuple(pos) for pos in movable_to ]) & set(self.all_pieces_movements(color=piece.color))
+		print(set([ tuple(pos) for pos in movable_to ]), set(self.all_pieces_movements(color=piece.color)))
+		return list(tuple(set([ tuple(pos) for pos in movable_to ]) & set(self.all_pieces_movements(color=piece.color))))
 
 	def piece_set_pos(self, _from: list, _to: list, movement: list = None, save: bool = False):
 		# sets position to piece and ignore any piece at TO position
@@ -626,7 +624,8 @@ class Game(models.Model):
 				enemies=self.black_pieces if piece.color == 'white' else self.white_pieces,
 				friends=self.black_pieces if piece.color == 'black' else self.white_pieces)
 			) != 0 and ( piece.color == color if color != None else True)
-		]))
+		])) ######################################################################################################
+		# Выдает не все возможные ходы и в неправильном виде
 
 	def destroyed_pieces_by_color(self, color: str) -> list:
 		return [ eval(f"{piece.split(' ')[0]}('{piece.split(' ')[1]}')") for piece in self.destroyed_pieces if piece.split(' ')[1] == color ]
