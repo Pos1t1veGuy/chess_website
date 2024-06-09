@@ -186,72 +186,111 @@ class GameConsumer(AsyncWebsocketConsumer):
         match mtype:
             case 'get_available_movements':
                 if 'position' in data.keys():
-                    if len(data['position']) == 2 and all([ isinstance(num, int) for num in data['position'] ]):
-                        if all([ 0 <= num <= 7 for num in data['position'] ]):
-                            piece = self.game[data['position']]
-                            if piece:
-                                if piece.color == self.color:
-                                    await self.send(text_data=json.dumps({
-                                        'type': 'available_positions',
-                                        'movements': await sync_to_async(self.game.piece_movable_to)(data['position']),
-                                    }))
+                    if data['position']:
+                        if len(data['position']) == 2 and all([ str(num).isdigit() for num in data['position'] ]):
+                            pos = [ int(num) for num in data['position'] ]
+                            if all([ 0 <= num <= 7 for num in pos ]):
+                                piece = self.game[pos]
+                                if piece:
+                                    print(piece, self.color)
+                                    if piece.color == self.color:
+                                        try:
+                                            res = await sync_to_async(self.game.piece_movable_to)(pos)
+                                        except Exception as e:
+                                            res = {'type': str(e)}
+
+                                        await self.send(text_data=json.dumps({
+                                            'type': 'available_positions',
+                                            'movements': res,
+                                        }))
+                                    else:
+                                        await self.send(text_data=json.dumps({
+                                            'type': f"You can not move { 'black' if self.color == 'white' else 'white' } pieces"
+                                        }))
                                 else:
-                                    await self.send(text_data=json.dumps({
-                                        'type': f"Ты не можешь двигать чужие { 'белые' if self.color == 'white' else 'черные' } фигуры"
-                                    }))
+                                    await self.send(text_data=json.dumps({'type': "Position is invalid"}))
                             else:
-                                await self.send(text_data=json.dumps({'type': f"Некорректно указана позиция фигуры"}))
+                                await self.send(text_data=json.dumps({'type': "Position is invalid"}))
                         else:
-                            await self.send(text_data=json.dumps({'type': f"Некорректно указана позиция фигуры"}))
+                            await self.send(text_data=json.dumps({'type': "Position is invalid"}))
                     else:
-                        await self.send(text_data=json.dumps({'type': f"Некорректно указана позиция фигуры"}))
+                        await self.send(text_data=json.dumps({'type': "Position is invalid"}))
             case 'user_gave_up':
                 await self.game.give_up(self.game.get_color_by_user(self.user))
                 await self.lose()
             case 'movement':
                 if 'from' in data.keys() and 'to' in data.keys():
-                    if len(data['from']) == 2 and all([ isinstance(num, int) for num in data['from'] ]):
-                        piece = self.game[data['from']]
-                        if piece:
-                            if piece.color == self.color:
-                                await self.send(text_data=json.dumps( await sync_to_async(self.game.move)(data['from'], data['to'], return_json=True) ))
+                    if data['from']:
+                        if data['to']:
+                            if len(data['from']) == 2 and all([ str(num).isdigit() for num in data['from'] ]):
+                                piece = self.game[data['from']]
+                                if piece:
+                                    print(piece, self.color)
+                                    if piece.color == self.color:
+                                        try:
+                                            res = await sync_to_async(self.game.move)([ int(num) for num in data['from'] ], data['to'])
+                                        except Exception as e:
+                                            res = {'type': str(e)}
+                                        await self.send(text_data=json.dumps(res))
+                                    else:
+                                        await self.send(text_data=json.dumps({
+                                            'type': f"You can not move { 'black' if self.color == 'white' else 'white' } pieces"
+                                        }))
+                                else:
+                                    await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
                             else:
-                                await self.send(text_data=json.dumps({
-                                    'type': f"Ты не можешь двигать чужие { 'белые' if self.color == 'white' else 'черные' } фигуры"
-                                }))
+                                await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
                         else:
-                            await self.send(text_data=json.dumps({'type': f"Некорректно указана позиция фигуры"}))
+                            await self.send(text_data=json.dumps({'type': "Position to is invalid"}))
                     else:
-                        await self.send(text_data=json.dumps({'type': f"Некорректно указана позиция фигуры"}))
+                        await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
 
             case 'transform_pawn':
                 if 'position' in data.keys() and 'to' in data.keys():
-                    if len(data['position']) == 2 and all([ isinstance(num, int) for num in data['position'] ]):
-                        piece = self.game[data['position']]
-                        if piece:
-                            if piece.color == self.color:
-                                if data['to'] in string_pieces.lower():
-                                    await self.send(text_data=await sync_to_async(self.game.transform_pawn)(data['position'], data['to'], return_json=True))
+                    if data['position']:
+                        if data['to']:
+                            if len(data['position']) == 2 and all([ str(num).isdigit() for num in data['position'] ]):
+                                piece = self.game[data['position']]
+                                if piece:
+                                    if piece.color == self.color:
+                                        if data['to'] in string_pieces.lower():
+                                            try:
+                                                res = await sync_to_async(self.game.transform_pawn)(
+                                                    [ int(num) for num in data['position'] ],
+                                                    data['to'],
+                                                    return_json=True
+                                                )
+                                            except Exception as e:
+                                                res = {'type': str(e)}
+                                            await self.send(text_data=json.dumps(res))
+                                        else:
+                                            await self.send(text_data=json.dumps({
+                                                'type': "Typed invalid piece name in which the pawn will be transformed"
+                                            }))
+                                    else:
+                                        await self.send(text_data=json.dumps({
+                                            'type': f"You can not move { 'black' if self.color == 'white' else 'white' } pieces"
+                                        }))
                                 else:
-                                    await self.send(text_data=json.dumps({
-                                        'type': "Указана неправильная фигура, в которую будет превращена клетка"
-                                    }))
+                                    await self.send(text_data=json.dumps({'type': "Position is invalid"}))
                             else:
-                                await self.send(text_data=json.dumps({
-                                    'type': f"Ты не можешь двигать чужие { 'белые' if self.color == 'white' else 'черные' } фигуры"
-                                }))
+                                await self.send(text_data=json.dumps({'type': "Position is invalid"}))
                         else:
-                            await self.send(text_data=json.dumps({'type': f"Некорректно указана позиция фигуры"}))
+                            await self.send(text_data=json.dumps({'type': "Position to is invalid"}))
                     else:
-                        await self.send(text_data=json.dumps({'type': f"Некорректно указана позиция фигуры"}))
+                        await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
 
             case 'castling':
-                if 'side' in data.keys():
-                    if data['side'] in ['left', 'right']:
-                        await self.send(text_data=json.dumps(await sync_to_async(self.game.castling)(data['to'], self.color, return_json=True)))
+                if 'direction' in data.keys():
+                    if data['direction'] in ['left', 'right']:
+                        try:
+                            res = await sync_to_async(self.game.castling)(data['direction'], self.color)
+                        except Exception as e:
+                            res = {'type': str(e)}
+                        await self.send(text_data=json.dumps(res))
                     else:
                         await self.send(text_data=json.dumps({
-                            'type': "Указана неправильная фигура, в которую будет превращена клетка"
+                            'type': "you typed invalid direction"
                         }))
 
     async def command_queue(self):
@@ -290,7 +329,17 @@ class GameConsumer(AsyncWebsocketConsumer):
         }))
         await self.disconnect(0)
 
+    async def get_score(self):
+        return await sync_to_async(lambda: self.score)()
+
+    @property
+    def score(self):
+        if self.user == self.game.white_player:
+            return self.game.white_player_score
+        elif self.user == self.game.black_player:
+            return self.game.black_player_score
+
     def __str__(self):
-        return f'Game[{self.user.username}]'
+        return f'GameConsumer[{self.user.username}, color={self.color}, score={self.score}]'
     def __repr__(self):
         return str(self)

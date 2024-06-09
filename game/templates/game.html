@@ -236,9 +236,15 @@
                 color = 'black'
             }
 
-            for (let x = 0; x < 8; x++) {
-                for (let y = 0; y < 8; y++) {
+            for (let y = 0; y < 8; y++) {
+                for (let x = 0; x < 8; x++) {
                     const cell = document.createElement('div')
+                    let pre_selected_cell
+                    if (color === 'white') {
+                        pre_selected_cell = [x, y]
+                    } else {
+                        pre_selected_cell = [Math.abs(x - 7), Math.abs(y - 7)]
+                    }
                     cell.className = 'cell'
                     if (color === 'white') {
                         if ((x + y) % 2 === 0) {
@@ -258,19 +264,19 @@
                         cell.classList.add('highlight')
                         highlightedCell = cell
 
-                        if (!is_cell_empty && cell.children.length === 0 && selected_cell !== [cell.dataset.x, cell.dataset.y] && last_piece) {
+                        if (!is_cell_empty && cell.children.length === 0 && selected_cell !== pre_selected_cell && last_piece) {
                             if (color === last_piece.dataset.color) {
                                 ws.send(JSON.stringify({
                                     'type': 'movement',
                                     'from': selected_cell,
-                                    'to': [cell.dataset.x, cell.dataset.y],
+                                    'to': pre_selected_cell,
                                 }))
-                                console.log(`Ход с клетки ${selected_cell} до клетки [${cell.dataset.x}, ${cell.dataset.y}], Фигура: ${last_piece.dataset.color} ${last_piece.dataset.type}`)
+                                console.log(`Ход с клетки ${pre_selected_cell} до клетки ${selected_cell}, Фигура: ${last_piece.dataset.color} ${last_piece.dataset.type}`)
                             }
-                        } else if ((!is_cell_empty && last_piece_color === color) || is_cell_empty) {
+                        } else if (!(cell.children.length === 0) && cell.children[0].dataset.color === color) {
                             ws.send(JSON.stringify({
                                 'type': 'get_available_movements',
-                                'position': [cell.dataset.x, cell.dataset.y],
+                                'position': pre_selected_cell,
                             }))
                         }
 
@@ -281,9 +287,9 @@
                         }
 
                         if (color === 'white') {
-                            selected_cell = [cell.dataset.x, cell.dataset.y]
+                            selected_cell = [x, y]
                         } else {
-                            selected_cell = [Math.abs(cell.dataset.x - 7), Math.abs(cell.dataset.y - 7)]
+                            selected_cell = [Math.abs(x - 7), Math.abs(y - 7)]
                         }
                     })
                     board.appendChild(cell)
@@ -326,20 +332,24 @@
         }
 
         const highlight_positions = (movements) => {
-            clear_highlighted() // Очистить предыдущие подсветки
-            movements.forEach(([x, y]) => {
+            clear_highlighted()
+            console.log(movements)
+            for (let i = 0; i < movements.length; i++) {
+                const x = movements[i][0]
+                const y = movements[i][1]
                 const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`)
                 if (cell) {
                     cell.classList.add('available')
-                    highlightedCells.push(cell) // Добавить в список подсвеченных клеток
+                    highlightedCells.push(cell)
+                    print(cell.dataset.x, cell.dataset.y)
                 }
-            });
-        };
+            }
+        }
 
         const clear_highlighted = () => {
-            highlightedCells.forEach(cell => {
-                cell.classList.remove('available')
-            })
+            for (let i; i < highlightedCells.length; i++) {
+                highlightedCells[i].classList.remove('available')
+            }
             highlightedCells = []
         }
 
