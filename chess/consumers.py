@@ -10,6 +10,7 @@ from game.pieces import string_pieces
 
 queue_consumers = []
 game_consumers_msgs = {}
+players_in_game = []
 
 
 class QueueConsumer(AsyncWebsocketConsumer):
@@ -142,7 +143,10 @@ class QueueConsumer(AsyncWebsocketConsumer):
 
 class GameConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        global players_in_game
+
         self.user = self.scope['user']
+        players_in_game.append(self.user)
         await self.accept()
 
         if self.user.is_authenticated:
@@ -156,26 +160,26 @@ class GameConsumer(AsyncWebsocketConsumer):
                 self.opponent = await sync_to_async(self.game.get_opponent_user)(self.user)
 
                 await self.send_opponent({'type':'opponent_is_connected'})
-                await self.send(text_data=json.dumps({
-                    'type': 'pieces_info',
-                    'board': self.game.movements[-1]
-                }))
 
                 self.command_queue_task = asyncio.create_task(self.command_queue())
+                self.client_comm_task = asyncio.create_task(self.client_comm())
             else:
                 await self.send(text_data=json.dumps({
                     'type': 'error',
                     'info': 'user has not a game'
                 }))
-                await self.close()
+                await self.disconnect(0)
         else:
             await self.send(text_data=json.dumps({
                 'type': 'error',
                 'info': 'only registered users can play'
             }))
-            await self.close()
+            await self.disconnect(0)
     
     async def disconnect(self, close_code):
+        global players_in_game
+        if self.user in players_in_game:
+            players_in_game.remove(self.user)
         self.end = True
         self.close()
 
@@ -194,10 +198,10 @@ class GameConsumer(AsyncWebsocketConsumer):
                                 if piece:
                                     print(piece, self.color)
                                     if piece.color == self.color:
-                                        #try:
-                                        res = await sync_to_async(self.game.piece_movable_to)(pos)
-                                        #except Exception as e:
-                                            #res = {'type': str(e)}
+                                        try:
+                                            res = await sync_to_async(self.game.piece_movable_to)(pos)
+                                        except Exception as e:
+                                            res = {'type': str(e)}
 
                                         await self.send(text_data=json.dumps({
                                             'type': 'available_positions',
@@ -309,6 +313,16 @@ class GameConsumer(AsyncWebsocketConsumer):
             
             await asyncio.sleep(.5)
 
+    async def client_comm(self):
+        while 1:
+            await self.send(text_data=json.dumps({
+                'type': "game_info",
+                'color': self.game.color,
+                'board': self.game.movements[-1],
+                'opponent_connected': await self.is_opponent_alive(),
+            }))
+            await asyncio.sleep(1)
+
     async def send_opponent(self, data: dict):
         global game_consumers_msgs
 
@@ -316,6 +330,10 @@ class GameConsumer(AsyncWebsocketConsumer):
             game_consumers_msgs[self.opponent].append(data)
         else:
             game_consumers_msgs[self.opponent] = [data]
+
+    async def is_opponent_alive(self):
+        global players_in_game
+        return self.opponent in players_in_game
 
     async def lose(self):
         await self.send(text_data=json.dumps({

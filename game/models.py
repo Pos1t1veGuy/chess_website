@@ -128,8 +128,7 @@ class Game(models.Model):
 		last_movement = movements[-1]
 
 		if isinstance(last_movement[_from[1]][_from[0]], Piece):
-			print(last_movement[_from[1]][_from[0]], player_color)
-			if not last_movement[_from[1]][_from[0]].color == player_color: # everything has its time
+			if (not last_movement[_from[1]][_from[0]].color == player_color) and self.movement_count != 0: # everything has its time
 				raise ValueError(f"{len(self.movements)} movement is for {player_color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
 		else:
 			raise ValueError("Position '_from' at last game move is empty or not on board, there must be piece to move it")
@@ -367,8 +366,11 @@ class Game(models.Model):
 		else:
 			raise ValueError(f'piece_movable_to takes Piece object or list with board position, not {piece}')
 
-		print(set([ tuple(pos) for pos in movable_to ]), set(self.all_pieces_movements(color=piece.color)))
-		return list(tuple(set([ tuple(pos) for pos in movable_to ]) & set(self.all_pieces_movements(color=piece.color))))
+		all_movements = self.all_pieces_movements(color=piece.color, return_dict=True)
+		if tuple(piece.pos) in all_movements.keys():
+			return list(tuple(set([ tuple(pos) for pos in movable_to ]) & set(all_movements[tuple(piece.pos)])))
+		else:
+			return []
 
 	def piece_set_pos(self, _from: list, _to: list, movement: list = None, save: bool = False):
 		# sets position to piece and ignore any piece at TO position
@@ -614,18 +616,32 @@ class Game(models.Model):
 								matrix[y][x] = 'K' + parts[1][0]
 		return '.' + '.'.join([ '.'.join(line)+'\n' for line in matrix ])
 
-	def all_pieces_movements(self, color: str = None) -> list: # these are the available movements taking into account check for the king
-		return list(set([
+	def all_pieces_movements(self, color: str = None, return_dict: bool = False) -> list: # these are the available movements taking into account check for the king
+		res = list(set([
 			tuple([ (tuple(piece.pos), tuple(pos)) for pos in piece.movable_to(
 				enemies=self.black_pieces if piece.color == 'white' else self.white_pieces,
 				friends=self.black_pieces if piece.color == 'black' else self.white_pieces)
-			])[0]
+			])
 			for piece in self.alive_pieces if len(piece.movable_to(
 				enemies=self.black_pieces if piece.color == 'white' else self.white_pieces,
 				friends=self.black_pieces if piece.color == 'black' else self.white_pieces)
-			) != 0 and ( piece.color == color if color != None else True)
-		])) ######################################################################################################
-		# Выдает не все возможные ходы и в неправильном виде
+			) != 0 and ( piece.color == color if color != None else True )
+		]))
+		list_res = []
+		res_dict = {}
+
+		for movement in res:
+			for m in movement:
+				list_res.append(m)
+
+		if return_dict:
+			for piece, to in list_res:
+				if piece in res_dict.keys():
+					res_dict[piece] = res_dict[piece] + (to,)
+				else:
+					res_dict[piece] = (to,)
+
+		return res_dict if return_dict else list_res
 
 	def destroyed_pieces_by_color(self, color: str) -> list:
 		return [ eval(f"{piece.split(' ')[0]}('{piece.split(' ')[1]}')") for piece in self.destroyed_pieces if piece.split(' ')[1] == color ]
@@ -638,6 +654,10 @@ class Game(models.Model):
 			return 'white'
 		else:
 			return 'black'
+
+	@property
+	def movement_count(self) -> int:
+		return len(self.movements)-1
 
 	@property
 	def alive_pieces(self) -> list:
