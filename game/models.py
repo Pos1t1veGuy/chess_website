@@ -59,6 +59,11 @@ def if_not_ended(func):
 def if_not_ended_and_started(func):
 	def wrapper(self, *args, **kwargs):
 		
+		if self.ended:
+			raise ValueError("The game is ended")
+		if not self.playing:
+			raise ValueError("The game is not started")
+
 		return func(self, *args, **kwargs)
 	return wrapper
 
@@ -119,16 +124,20 @@ class Game(models.Model):
 		super().__init__(*args, **kwargs)
 		self.actions = [self.move, self.castling, self.transform_pawn]
 
-	@if_not_ended_and_started
 	@if_time_is_not_up
 	def move(self, _from: list, _to: list, predict_score: bool = False, start_score: int = 100):
 		player_color = self.color
 
 		movements = self.soft_movements
 		last_movement = movements[-1]
+		first_movement = False
 
 		if isinstance(last_movement[_from[1]][_from[0]], Piece):
-			if (not last_movement[_from[1]][_from[0]].color == player_color) and self.movement_count != 0: # everything has its time
+			if not (self.movement_count != 0 and last_movement[_from[1]][_from[0]].color == player_color): # everything has its time
+				raise ValueError(f"{len(self.movements)} movement is for {player_color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
+			elif self.movement_count == 0 and self.color == 'white':
+				first_movement = True
+			else:
 				raise ValueError(f"{len(self.movements)} movement is for {player_color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
 		else:
 			raise ValueError("Position '_from' at last game move is empty or not on board, there must be piece to move it")
@@ -155,7 +164,7 @@ class Game(models.Model):
 		
 		if self.ended:
 			raise ValueError("The game is ended")
-		if not self.playing:
+		if not self.playing or first_movement:
 			raise ValueError("The game is not started")
 
 		destroyed_piece = last_movement[_to[1]][_to[0]] if isinstance(last_movement[_to[1]][_to[0]], Piece) else None
@@ -163,6 +172,7 @@ class Game(models.Model):
 		new_movement = self.make_movement(last_movement, _from, _to, reg_destroyed_pieces=True)
 		if (list(_from), list(_to)) in save_king_movements or not (tuple(_from), tuple(_to)) in all_movements:
 			if not predict_score:
+				self.start()
 				self.update_time()
 				self.set_scores(new_movement, player_color, start_score, destroyed_piece, transformed_pawn=False)
 				self.save_movement(new_movement)

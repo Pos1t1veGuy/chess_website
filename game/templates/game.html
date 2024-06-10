@@ -184,6 +184,7 @@
         let highlightedCells = []
         let color
         let opponnent_is_connected = false
+        let ws
 
         const user_id = {{ user.id }}
         const white_id = {{ game.white_player.id }}
@@ -220,6 +221,40 @@
             }
         }
 
+        const connectWebSocket = () => {
+            ws = new WebSocket('ws://' + window.location.host + '/ws/game/')
+
+            ws.onopen = (event) => {
+                console.log('WebSocket is opened now')
+            };
+
+            ws.onclose = (event) => {
+                console.log('WebSocket is closed now.')
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data)
+                console.log('message is received ' + data.type)
+
+                switch (data.type) {
+                    case 'available_positions':
+                    highlight_positions(data.movements)
+                    break
+                case 'game_info':
+                    current_turn = data.color
+                    updatePieces(data.board)
+                    opponnent_is_connected = data.opponent_connected
+                    break
+                }
+            };
+        };
+
+        const ensureWebSocketConnection = () => {
+            if (ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+                console.log('Reconnecting WebSocket...');
+                connectWebSocket();
+            }
+        };
 
         const leaveGame = () => {
             ws.send(JSON.stringify({
