@@ -37,7 +37,7 @@ class GameConfig(AppConfig):
 
     async def start_game(self, white: 'QueueConsumer', black: 'QueueConsumer', time: int):
         from .models import Game
-        game = await sync_to_async(Game.objects.create)(white_player=white.user, black_player=black.user, max_time=time)
+        game = await sync_to_async(Game.objects.create)(white_player=white.user, black_player=black.user, max_time=time * 60)
         await sync_to_async(game.save)()
 
         for con in [white, black]:

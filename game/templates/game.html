@@ -144,6 +144,19 @@
                 border-radius: 10px;
             }
         }
+
+        #notifications {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 1000;
+            max-width: 200px;
+        }
     </style>
 </head>
 <body>
@@ -155,11 +168,12 @@
             <div class="player-card {% if game.white_player.id == user.id %}active{% endif %}">
                 <div class="player-avatar" style="background-image: url('{{ game.white_player.avatar.url }}');"></div>
                 <div class="player-name">@{{ game.white_player.username }}</div>
-                <!--<div class="player-info">Счет: {{ ... }}</div>-->
-                <div class="player-info">Время: {{ white_player_time }} / {{ max_time }} сек</div>
+                <div class="player-info">Счет: <span id="white-score">0</span></div>
+                <div class="player-info">Время: <span id="white-time">0</span> / {{ max_time }} сек</div>
                 <div class="player-info">Уровень: {{ game.white_player.level }}</div>
-                <div class="player-info">Винрейт: {{ game.white_player.winrate }}</div>
+                <div class="player-info">Винрейт: {{ game.white_player.winrate }}%</div>
             </div>
+            <div id="left-notifications"></div>
         </div>
         <div class="board-container">
             <div class="board" id="board"></div>
@@ -168,11 +182,12 @@
             <div class="player-card {% if game.black_player.id == user.id %}active{% endif %}">
                 <div class="player-avatar" style="background-image: url('{{ game.black_player.avatar.url }}');"></div>
                 <div class="player-name">@{{ game.black_player.username }}</div>
-                <!--<div class="player-info">Счет: {{ ... }}</div>-->
-                <div class="player-info">Время: {{ black_player_time }} / {{ max_time }} сек</div>
+                <div class="player-info">Счет: <span id="black-score">0</span></div>
+                <div class="player-info">Время: <span id="black-time">0</span> / {{ max_time }} сек</div>
                 <div class="player-info">Уровень: {{ game.black_player.level }}</div>
-                <div class="player-info">Винрейт: {{ game.black_player.winrate }}</div>
+                <div class="player-info">Винрейт: {{ game.black_player.winrate }}%</div>
             </div>
+            <div id="right-notifications"></div>
         </div>
     </div>
 
@@ -185,40 +200,43 @@
         let color
         let opponnent_is_connected = false
         let ws
+        let connecting = false
+        let connected = false
 
         const user_id = {{ user.id }}
         const white_id = {{ game.white_player.id }}
         const mirrored = white_id !== user_id
 
+        const white_score = document.getElementById('white-score')
+        const black_score = document.getElementById('black-score')
+        const white_time = document.getElementById('white-time')
+        const black_time = document.getElementById('black-time')
+
+        let self_score
+        let self_time
+        let opponent_score
+        let opponent_time
+        let self_notifications
+        let opponent_notifications
+
         if (user_id === white_id) {
             color = 'white'
+
+            self_notifications = "left-notifications"
+            opponent_notifications = "right-notifications"
+            self_score = white_score
+            self_time = white_time
+            opponent_score = black_score
+            opponent_time = black_time
         } else {
             color = 'black'
-        }
 
-        ws = new WebSocket('ws://' + window.location.host + '/ws/game/')
-
-        ws.onopen = (event) => {
-            console.log('WebSocket is open now.')
-        }
-        ws.onclose = function(event) {
-            console.log('WebSocket is closed now.')
-        }
-
-        ws.onmessage = function(event) {
-            const data = JSON.parse(event.data)
-            console.log('message is received ' + data.type)
-
-            switch (data.type) {
-                case 'available_positions':
-                    highlight_positions(data.movements)
-                    break
-                case 'game_info':
-                    current_turn = data.color
-                    updatePieces(data.board)
-                    opponnent_is_connected = data.opponent_connected
-                    break
-            }
+            self_notifications = "right-notifications"
+            opponent_notifications = "left-notifications"
+            self_score = black_score
+            self_time = black_time
+            opponent_score = white_score
+            opponent_time = white_time
         }
 
         const connectWebSocket = () => {
@@ -226,10 +244,14 @@
 
             ws.onopen = (event) => {
                 console.log('WebSocket is opened now')
+                connecting = false
+                connected = true
             };
 
             ws.onclose = (event) => {
                 console.log('WebSocket is closed now.')
+                connected = false
+                updateNotifications(self_notifications, 'Соединение потеряно', () => !connected)
             };
 
             ws.onmessage = function(event) {
@@ -243,7 +265,17 @@
                 case 'game_info':
                     current_turn = data.color
                     updatePieces(data.board)
-                    opponnent_is_connected = data.opponent_connected
+                    opponnent_is_connected = data.opponent_info.is_connected
+                    if (!opponnent_is_connected && data.opponent_connected) {
+                        updateNotifications(opponent_notifications, 'Соперник подключился к игре', () => connected && opponnent_is_connected, timeToLive=3000)
+                    } else if (opponnent_is_connected && !data.opponent_connected) {
+                        updateNotifications(opponent_notifications, 'Соперник потерял соединение', () => connected && !opponnent_is_connected)
+                    }
+                    self_time.textContent = data.self_info.time
+                    self_score.textContent = data.self_info.score
+
+                    opponent_time.textContent = data.opponent_info.time
+                    opponent_score.textContent = data.opponent_info.score
                     break
                 }
             };
@@ -251,8 +283,10 @@
 
         const ensureWebSocketConnection = () => {
             if (ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-                console.log('Reconnecting WebSocket...');
-                connectWebSocket();
+                connecting = true
+                console.log('Reconnecting WebSocket...')
+                connectWebSocket()
+                updateNotifications(self_notifications, 'Переподключение...', () => !connected)
             }
         };
 
@@ -288,6 +322,7 @@
                     cell.dataset.x = x
                     cell.dataset.y = y
                     cell.addEventListener('click', () => {
+                        ensureWebSocketConnection()
                         if (highlightedCell) {
                             highlightedCell.classList.remove('highlight')
                         }
@@ -319,7 +354,7 @@
                         if (color === 'white') {
                             selected_cell = [x, y]
                         } else {
-                            selected_cell = [Math.abs(x - 7), Math.abs(y - 7)]
+                            selected_cell = [x, Math.abs(y - 7)]
                         }
                         clear_highlighted()
                     })
@@ -328,12 +363,16 @@
             }
 
             document.body.addEventListener('click', (e) => {
+                ensureWebSocketConnection()
                 if (highlightedCell && !e.target.classList.contains('cell')) {
                     highlightedCell.classList.remove('highlight')
                     highlightedCell = null
                     clear_highlighted()
                 }
             }, true)
+            document.body.addEventListener('mousemove', (e) => {
+                ensureWebSocketConnection()
+            })
         }
 
         const updatePieces = (boardLayout) => {
@@ -371,7 +410,7 @@
                 let x = movements[i][0]
                 let y = movements[i][1]
                 if (color == 'black') {
-                    x = Math.abs(x - 7)
+                    x = x
                     y = Math.abs(y - 7)
                 }
                 const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`)
@@ -389,6 +428,22 @@
             highlightedCells = []
         }
 
+        const updateNotifications = (notif_element_id, message, condition, timeToLive = null) => {
+            const notifications = document.getElementById(notif_element_id)
+            if (condition()) {
+                notifications.innerHTML = message
+                notifications.style.display = 'block'
+                if (timeToLive) {
+                    setTimeout(() => {
+                        notifications.style.display = 'none'
+                    }, timeToLive)
+                }
+            } else {
+                notifications.style.display = 'none'
+            }
+        }
+
+        connectWebSocket()
         createBoard()
     </script>
 </body>

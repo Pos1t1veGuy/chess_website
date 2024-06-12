@@ -133,9 +133,10 @@ class Game(models.Model):
 		first_movement = False
 
 		if isinstance(last_movement[_from[1]][_from[0]], Piece):
-			if not (self.movement_count != 0 and last_movement[_from[1]][_from[0]].color == player_color): # everything has its time
-				raise ValueError(f"{len(self.movements)} movement is for {player_color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
-			elif self.movement_count == 0 and self.color == 'white':
+			print(last_movement[_from[1]][_from[0]].color, self.color)
+			if last_movement[_from[1]][_from[0]].color == player_color: # everything has its time
+				pass
+			elif self.movement_count == 0 and last_movement[_from[1]][_from[0]].color == self.color == 'white':
 				first_movement = True
 			else:
 				raise ValueError(f"{len(self.movements)} movement is for {player_color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
@@ -156,7 +157,7 @@ class Game(models.Model):
 		for i, fromto in enumerate([_from, _to]):
 			if isinstance(fromto, list):
 				if len(fromto) == 2:
-					if isisnstance(fromto[0], int) and isisnstance(fromto[1], int):
+					if isinstance(fromto[0], int) and isinstance(fromto[1], int):
 						if 0 <= fromto[0] <= 7 and 0 <= fromto[1] <= 7:
 							continue
 
@@ -164,7 +165,7 @@ class Game(models.Model):
 		
 		if self.ended:
 			raise ValueError("The game is ended")
-		if not self.playing or first_movement:
+		if not self.playing and not first_movement:
 			raise ValueError("The game is not started")
 
 		destroyed_piece = last_movement[_to[1]][_to[0]] if isinstance(last_movement[_to[1]][_to[0]], Piece) else None
@@ -428,12 +429,12 @@ class Game(models.Model):
 			else:
 				res = self.black_player_time
 
-		return round(res, 1)
+		return int(res)
 
 	@if_not_ended
 	@if_time_is_not_up
 	def time_left(self, color: str) -> int:
-		return round(self.max_time - self.passed_time(color), 6)
+		return int(self.max_time - self.passed_time(color))
 
 	@if_not_ended
 	def start(self):
@@ -560,7 +561,10 @@ class Game(models.Model):
 			else:
 				w3 = sum([ piece.price for piece in dp1 ]) / sum([ piece.price for piece in dp2 ])
 
-		w4 = self.passed_time(player) / self.passed_time('white' if player == 'black' else 'white')
+		if self.passed_time('white' if player == 'black' else 'white') != 0:
+			w4 = self.passed_time(player) / self.passed_time('white' if player == 'black' else 'white')
+		else:
+			w4 = 0
 
 
 		kings = []

@@ -315,13 +315,24 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     async def client_comm(self):
         while 1:
+            if self.end:
+                break
+            
             await self.send(text_data=json.dumps({
                 'type': "game_info",
                 'color': self.game.color,
                 'board': self.game.movements[-1],
-                'opponent_connected': await self.is_opponent_alive(),
+                'opponent_info': {
+                    'is_connected': await self.is_opponent_alive(),
+                    'time': self.game.passed_time('white' if self.color == 'black' else 'black'),
+                    'score': await sync_to_async(lambda: (self.game.white_player_score if self.color == 'black' else self.game.black_player_score))(),
+                },
+                'self_info': {
+                    'time': self.game.passed_time(self.color),
+                    'score': await sync_to_async(lambda: (self.game.white_player_score if self.color == 'white' else self.game.black_player_score))(),
+                }
             }))
-            await asyncio.sleep(1)
+            await asyncio.sleep(.5)
 
     async def send_opponent(self, data: dict):
         global game_consumers_msgs
