@@ -196,7 +196,6 @@ class GameConsumer(AsyncWebsocketConsumer):
                             if all([ 0 <= num <= 7 for num in pos ]):
                                 piece = self.game[pos]
                                 if piece:
-                                    print(piece, self.color)
                                     if piece.color == self.color:
                                         try:
                                             res = await sync_to_async(self.game.piece_movable_to)(pos)
@@ -229,7 +228,6 @@ class GameConsumer(AsyncWebsocketConsumer):
                             if len(data['from']) == 2 and all([ str(num).isdigit() for num in data['from'] ]):
                                 piece = self.game[data['from']]
                                 if piece:
-                                    print(piece, self.color)
                                     if piece.color == self.color:
                                         try:
                                             res = await sync_to_async(self.game.move)([ int(num) for num in data['from'] ], data['to'])

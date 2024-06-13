@@ -20,7 +20,7 @@ def leaders(request): # Доделать джаваскриптовую подг
 
 def game(request, game_id: int):
 	game = get_object_or_404(Game, id=game_id)
-	if request.user in game.players:
+	if request.user in game.players and not game.ended:
 		return render(request, 'game.html', {
 			'user': request.user,
 			'game': game,

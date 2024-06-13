@@ -1,8 +1,11 @@
+from typing import *
 from django.apps import AppConfig
 from django.core.cache import cache
 from asgiref.sync import sync_to_async
+from django.conf import settings
+from PIL import Image
 
-import asyncio, threading, json, random
+import asyncio, threading, json, random, os, sys
 
 
 class GameConfig(AppConfig):
@@ -98,6 +101,17 @@ class GameConfig(AppConfig):
             }
         }))
 
+    def resize_pieces_images(self, size: List[int], result_dir: str = '/media/modified_pieces/'):
+        base = str(settings.BASE_DIR)
+        if not os.path.isdir(base + result_dir):
+            os.mkdir(base + result_dir)
+
+        for obj in os.listdir(base + '/media/pieces'):
+            if obj.split('.')[-1] == 'png' and obj.split('_')[0] in ['white', 'black']:
+                image = Image.open(base + '/media/pieces/' + obj)
+                image.thumbnail(size, Image.Resampling.LANCZOS)
+                image.save(base + result_dir + obj)
+
     def ready(self):
         def start_game_starter_loop():
             loop = asyncio.new_event_loop()
@@ -106,3 +120,5 @@ class GameConfig(AppConfig):
 
         thread = threading.Thread(target=start_game_starter_loop, daemon=True)
         thread.start()
+
+        self.resize_pieces_images(settings.PIECES_IMAGES_SIZE)

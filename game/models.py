@@ -133,15 +133,14 @@ class Game(models.Model):
 		first_movement = False
 
 		if isinstance(last_movement[_from[1]][_from[0]], Piece):
-			print(last_movement[_from[1]][_from[0]].color, self.color)
-			if last_movement[_from[1]][_from[0]].color == player_color: # everything has its time
-				pass
-			elif self.movement_count == 0 and last_movement[_from[1]][_from[0]].color == self.color == 'white':
+			if self.movement_count == 0 and last_movement[_from[1]][_from[0]].color == self.color == 'white':
 				first_movement = True
+			elif last_movement[_from[1]][_from[0]].color == player_color: # everything has its time
+				pass
 			else:
 				raise ValueError(f"{len(self.movements)} movement is for {player_color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
 		else:
-			raise ValueError("Position '_from' at last game move is empty or not on board, there must be piece to move it")
+			raise ValueError("Position from at last game move is empty or not on board, there must be piece to move it")
 
 		all_movements = self.all_pieces_movements(player_color)
 		save_king_movements = []
@@ -482,10 +481,10 @@ class Game(models.Model):
 		else:
 			self.winner = 'friendship'
 
+		self.ended = True
 		self.white_player.global_score += self.white_player_score
 		self.black_player.global_score += self.black_player_score
-		self.end_reason = reason
-		self.ended = True
+		self.end_reason = res
 
 	def get_color_by_user(self, user: 'User') -> str:
 		if self.white_player == user:
