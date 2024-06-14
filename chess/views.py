@@ -1,9 +1,12 @@
 from django.shortcuts import render
-from django.http import HttpResponse, Http404
+from django.http import HttpResponse, Http404, FileResponse
 from django.views import View
+from django.conf import settings
 
 from AUTH.models import User
 import json
+import random
+import os
 
 
 class api(View):
@@ -27,3 +30,13 @@ class api(View):
 							return HttpResponse(json.dumps(users))
 
 		raise Http404('')
+
+def random_favicon(request):
+	try:
+		icons = os.listdir(settings.ICONS_DIR)
+		if icons:
+			return FileResponse(open(f'{settings.ICONS_DIR}/{random.choice(icons)}', 'rb'), content_type='image/x-icon')
+		else:
+			raise Http404("No icons found")
+	except FileNotFoundError:
+		raise Http404("Icon directory not found")

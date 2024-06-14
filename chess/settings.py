@@ -134,9 +134,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+ICONS_DIR = f'{BASE_DIR}/media/icons/'.replace('\\', '/')
+ICONS_SIZE = (200, 200)
 
 AUTH_USER_MODEL = 'AUTH.User'
 
 LEADERS_PORTION = 20
 
-PIECES_IMAGES_SIZE = [180, 180]
+PIECES_IMAGES_SIZE =(180, 180)
+MODIFIED_PIECES_DIR = f'{BASE_DIR}/media/modified_pieces/'.replace('\\', '/')
+PIECES_DIR = f'{BASE_DIR}/media/pieces/'.replace('\\', '/')

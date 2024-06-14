@@ -4,6 +4,7 @@ from django.core.cache import cache
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from PIL import Image
+from shutil import rmtree
 
 import asyncio, threading, json, random, os, sys
 
@@ -101,16 +102,25 @@ class GameConfig(AppConfig):
             }
         }))
 
-    def resize_pieces_images(self, size: List[int], result_dir: str = '/media/modified_pieces/'):
-        base = str(settings.BASE_DIR)
-        if not os.path.isdir(base + result_dir):
-            os.mkdir(base + result_dir)
+    def resize_pieces_images(self, size: List[int], result_dir: str):
+        if os.path.isdir(result_dir):
+            rmtree(result_dir)
+        os.mkdir(result_dir)
 
-        for obj in os.listdir(base + '/media/pieces'):
+        for obj in os.listdir(settings.PIECES_DIR):
             if obj.split('.')[-1] == 'png' and obj.split('_')[0] in ['white', 'black']:
-                image = Image.open(base + '/media/pieces/' + obj)
-                image.thumbnail(size, Image.Resampling.LANCZOS)
-                image.save(base + result_dir + obj)
+                image = Image.open(settings.PIECES_DIR + obj)
+                image.save(result_dir + obj, sizes=[size])
+
+    def create_icons(self, size: List[int], result_dir: str):
+        if os.path.isdir(result_dir):
+            rmtree(result_dir)
+        os.mkdir(result_dir)
+
+        for obj in os.listdir(settings.MODIFIED_PIECES_DIR):
+            if obj.split('.')[-1] == 'png':
+                image = Image.open(settings.MODIFIED_PIECES_DIR + obj)
+                image.save(result_dir + '.'.join(obj.split('.')[:-1]) + '.ico', format='ICO', sizes=[size])
 
     def ready(self):
         def start_game_starter_loop():
@@ -121,4 +131,5 @@ class GameConfig(AppConfig):
         thread = threading.Thread(target=start_game_starter_loop, daemon=True)
         thread.start()
 
-        self.resize_pieces_images(settings.PIECES_IMAGES_SIZE)
+        self.resize_pieces_images(settings.PIECES_IMAGES_SIZE, settings.MODIFIED_PIECES_DIR)
+        self.create_icons(settings.ICONS_SIZE, settings.ICONS_DIR)

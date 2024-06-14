@@ -5,14 +5,15 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 
+from .views import api, random_favicon
 
-from .views import api
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('account/', include('AUTH.urls')),
     path('api/', api.as_view(), name='api'),
     path('', include('game.urls')),
+    path('favicon.ico', random_favicon, name='favicon'),
 ]
 
 if settings.DEBUG:
