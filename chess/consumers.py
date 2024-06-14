@@ -6,6 +6,7 @@ from asgiref.sync import sync_to_async
 from AUTH.models import User
 from game.models import Game
 from game.pieces import string_pieces
+import traceback
 
 
 queue_consumers = []
@@ -56,6 +57,8 @@ class QueueConsumer(AsyncWebsocketConsumer):
             await self.close()
     
     async def disconnect(self, close_code):
+        print(f'Disconnect called with close_code: {close_code}')
+        print(''.join(traceback.format_stack()))
         await self.remove_from_queue()
         self.end = True
         self.close()

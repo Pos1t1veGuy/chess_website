@@ -11,9 +11,9 @@ import threading
 import json
 import random
 import os, sys
-import signal
+# import signal
 
-shutdown_handlers = []
+# shutdown_handlers = []
 
 
 class GameConfig(AppConfig):
@@ -109,39 +109,39 @@ class GameConfig(AppConfig):
             }
         }))
 
-    def resize_pieces_images(self, size: List[int], result_dir: str):
-        global shutdown_handlers
+    # def resize_pieces_images(self, size: List[int], result_dir: str):
+    #     global shutdown_handlers
 
-        if os.path.isdir(result_dir):
-            rmtree(result_dir)
-        os.mkdir(result_dir)
-        shutdown_handlers.append(lambda: rmtree(result_dir) if os.path.isdir(result_dir) else ...)
+    #     if os.path.isdir(result_dir):
+    #         rmtree(result_dir)
+    #     os.mkdir(result_dir)
+    #     shutdown_handlers.append(lambda: rmtree(result_dir) if os.path.isdir(result_dir) else ...)
 
-        for obj in os.listdir(settings.PIECES_DIR):
-            if obj.split('.')[-1] == 'png' and obj.split('_')[0] in ['white', 'black']:
-                image = Image.open(settings.PIECES_DIR + obj)
-                image.save(result_dir + obj, sizes=[size])
+    #     for obj in os.listdir(settings.PIECES_DIR):
+    #         if obj.split('.')[-1] == 'png' and obj.split('_')[0] in ['white', 'black']:
+    #             image = Image.open(settings.PIECES_DIR + obj)
+    #             image.save(result_dir + obj, sizes=[size])
 
-    def create_icons(self, size: List[int], result_dir: str):
-        global shutdown_handlers
+    # def create_icons(self, size: List[int], result_dir: str):
+    #     global shutdown_handlers
 
-        if os.path.isdir(result_dir):
-            rmtree(result_dir)
-        os.mkdir(result_dir)
-        shutdown_handlers.append(lambda: rmtree(result_dir) if os.path.isdir(result_dir) else ...)
+    #     if os.path.isdir(result_dir):
+    #         rmtree(result_dir)
+    #     os.mkdir(result_dir)
+    #     shutdown_handlers.append(lambda: rmtree(result_dir) if os.path.isdir(result_dir) else ...)
 
-        for obj in os.listdir(settings.MODIFIED_PIECES_DIR):
-            if obj.split('.')[-1] == 'png':
-                image = Image.open(settings.MODIFIED_PIECES_DIR + obj)
-                image.save(result_dir + '.'.join(obj.split('.')[:-1]) + '.ico', format='ICO', sizes=[size])
+    #     for obj in os.listdir(settings.MODIFIED_PIECES_DIR):
+    #         if obj.split('.')[-1] == 'png':
+    #             image = Image.open(settings.MODIFIED_PIECES_DIR + obj)
+    #             image.save(result_dir + '.'.join(obj.split('.')[:-1]) + '.ico', format='ICO', sizes=[size])
 
-    def shutdown(self, signum, frame):
-        global shutdown_handlers
+    # def shutdown(self, signum, frame):
+    #     global shutdown_handlers
 
-        for func in shutdown_handlers:
-            func()
+    #     for func in shutdown_handlers:
+    #         func()
 
-        sys.exit(0)
+    #     sys.exit(0)
 
     def ready(self):
         def start_game_starter_loop():
@@ -152,7 +152,7 @@ class GameConfig(AppConfig):
         thread = threading.Thread(target=start_game_starter_loop, daemon=True)
         thread.start()
 
-        self.resize_pieces_images(settings.PIECES_IMAGES_SIZE, settings.MODIFIED_PIECES_DIR)
-        self.create_icons(settings.ICONS_SIZE, settings.ICONS_DIR)
+        # self.resize_pieces_images(settings.PIECES_IMAGES_SIZE, settings.MODIFIED_PIECES_DIR)
+        # self.create_icons(settings.ICONS_SIZE, settings.ICONS_DIR)
 
-        signal.signal(signal.SIGINT, self.shutdown)
+        # signal.signal(signal.SIGINT, self.shutdown)
