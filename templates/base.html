@@ -245,7 +245,7 @@
             }
         {% else %}
             const continue_game = () => {
-                window.location.href =  '/games/{{ user.get_active_game.id }}'
+                window.location.href =  '/games/{{ user.active_game.id }}'
             }
         {% endif %}
     </script>

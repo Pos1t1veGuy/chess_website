@@ -28,21 +28,26 @@ class GameConfig(AppConfig):
             from chess.consumers import queue_consumers
             self.queue_consumers = queue_consumers
 
+            processed_pair = []
+
             for con1 in self.queue_consumers:
                 for con2 in self.queue_consumers:
-                    if con1.user != con2.user and await self.similar_players(con1.user, con2.user):
-                        intersection = list( list(set( range(con1.min, con1.max) ) & set( range(con2.min, con2.max) )) )
+                    if not [con2, con1] in processed_pair:
+                        processed_pair.append([con1, con2])
 
-                        if len(intersection) > 0 and not con1.user in con2.black_list and not con2.user in con1.black_list:
-                            if con1.searching and con2.searching:
-                                con1.searching, con2.searching = False, False
-                                con1.opponent, con2.opponent = con2, con1
-                                await self.notice_queue_players(con1, con2)
-                            elif (con1.clicked and not con1.ready) or (con2.clicked and not con2.ready):
-                                await con1.cancel(ban=con2.user)
-                                await con2.cancel(ban=con1.user)
-                            elif con1.clicked and con1.ready and con2.clicked and con2.ready:
-                                await self.start_game(*random.choice([[con1, con2], [con2, con1]]), await self.get_mid_time(con1, con2))
+                        if con1.user != con2.user and await self.similar_players(con1.user, con2.user):
+                            intersection = list( list(set( range(con1.min, con1.max) ) & set( range(con2.min, con2.max) )) )
+
+                            if len(intersection) > 0 and not con1.user in con2.black_list and not con2.user in con1.black_list:
+                                if con1.searching and con2.searching:
+                                    con1.searching, con2.searching = False, False
+                                    con1.opponent, con2.opponent = con2, con1
+                                    await self.notice_queue_players(con1, con2)
+                                elif (con1.clicked and not con1.ready) or (con2.clicked and not con2.ready):
+                                    await con1.cancel(ban=con2.user)
+                                    await con2.cancel(ban=con1.user)
+                                elif con1.clicked and con1.ready and con2.clicked and con2.ready:
+                                    await self.start_game(*random.choice([[con1, con2], [con2, con1]]), await self.get_mid_time(con1, con2))
 
             await asyncio.sleep(1)
 
@@ -73,9 +78,13 @@ class GameConfig(AppConfig):
         user2_level = await sync_to_async(lambda: user2.winrate)()
         user2_games_count = await sync_to_async(lambda: user2.winrate)()
 
+        print(1)
         if user1_level - level_interval <= user2_level <= user1_level + level_interval:
+            print(2)
             if user1_winrate - winrate_interval <= user2_winrate <= user1_winrate + winrate_interval:
+                print(3)
                 if user1_games_count - games_interval <= user2_games_count <= user1_games_count + games_interval:
+                    print(4)
                     return True
 
         return False

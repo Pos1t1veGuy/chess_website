@@ -73,10 +73,15 @@ def if_time_is_not_up(func):
 
 		if self.playing:
 			if self.color == 'white' and self.white_player_time + timedelta >= self.max_time:
+				print(3)
 				self.end(win='black', res='time')
 			elif self.color == 'black' and self.black_player_time + timedelta >= self.max_time:
+				print(4)
 				self.end(win='white', res='time')
-
+			else:
+				raise ValueError("The game is ended")
+		else:
+			raise ValueError("The game is not started")
 		return func(self, *args, **kwargs)
 	return wrapper
 
@@ -248,6 +253,7 @@ class Game(models.Model):
 		else:
 			raise ValueError(f'give_up takes a string, that means losser color, black or white')
 
+	@if_not_ended
 	@if_time_is_not_up
 	def castling(self, color: str, side: str, predict_score: bool = False, start_score: int = 100):
 		if side in ['left', 'right']: # 1 - left, 0 - right
@@ -314,6 +320,8 @@ class Game(models.Model):
 		else:
 			raise ValueError(f"{len(self.movements)} movement is for {self.color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
 
+	@if_not_ended
+	@if_time_is_not_up
 	def make_movement(self, last_movement: list, _from: list, _to: list, reg_destroyed_pieces: bool = False) -> list:
 		# sets position to piece and will destroy enemy piece if it is at TO position and checks kings
 		player_color = self.color
@@ -343,6 +351,8 @@ class Game(models.Model):
 
 		return last_movement
 
+	@if_not_ended
+	@if_time_is_not_up
 	def set_scores(self, *args, **kwargs):
 		score = self.get_movement_score(*args, **kwargs)
 		if self.color == 'white':
@@ -352,6 +362,8 @@ class Game(models.Model):
 			self.black_player_score += score
 			self.white_player_score -= score*.5
 
+	@if_not_ended
+	@if_time_is_not_up
 	def save_movement(self, new_movement: list):
 		movements = self.soft_movements
 		movements.append(new_movement)
@@ -359,6 +371,8 @@ class Game(models.Model):
 		self.last_movement_time = timezone.now()
 		self.save()
 
+	@if_not_ended
+	@if_time_is_not_up
 	def piece_movable_to(self, piece: 'Piece'):
 		if isinstance(piece, Piece):
 			movable_to = piece.movable_to(
@@ -382,6 +396,8 @@ class Game(models.Model):
 		else:
 			return []
 
+	@if_not_ended
+	@if_time_is_not_up
 	def piece_set_pos(self, _from: list, _to: list, movement: list = None, save: bool = False):
 		# sets position to piece and ignore any piece at TO position
 		if isinstance(self[_from], Piece):
@@ -482,9 +498,11 @@ class Game(models.Model):
 			self.winner = 'friendship'
 
 		self.ended = True
+		self.playing = False
 		self.white_player.global_score += self.white_player_score
 		self.black_player.global_score += self.black_player_score
 		self.end_reason = res
+		self.save()
 
 	def get_color_by_user(self, user: 'User') -> str:
 		if self.white_player == user:

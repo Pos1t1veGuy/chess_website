@@ -107,6 +107,9 @@ class User(AbstractUser):
     def is_in_game(self) -> bool:
         return bool([ game for game in self.games if not game.ended ])
     @property
-    def get_active_game(self) -> 'Game':
+    def active_game(self) -> 'Game':
         if self.is_in_game:
             return self.games[-1]
+    @property
+    def available_game(self) -> 'Game':
+        return self.get_active_game
