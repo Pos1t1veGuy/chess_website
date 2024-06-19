@@ -3,6 +3,8 @@ from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 from asgiref.sync import sync_to_async
 
+from django.conf import settings
+
 from typing import *
 
 import os
@@ -30,6 +32,7 @@ class ModelUtils:
 
 
 class User(AbstractUser):
+    username = models.CharField(max_length=settings.MAX_USERNAME_LENGTH, unique=True)
     email = models.EmailField(unique=True, verbose_name='email')
     avatar = models.ImageField(upload_to=ModelUtils.avatar_filename, default='avatars/default_user.png', verbose_name='Avatar Picture')
     last_updated = models.DateTimeField(auto_now=True, verbose_name='Last Update')
@@ -40,7 +43,7 @@ class User(AbstractUser):
         if self.id:
             old_user = User.objects.get(pk=self.id)
 
-            if self.avatar and old_user.avatar != self.avatar: # update avatar
+            if self.avatar and old_user.avatar != self.avatar:
                 old_user.avatar.delete()
 
         super(User, self).save(*args, **kwargs)
@@ -103,3 +106,7 @@ class User(AbstractUser):
     @property
     def is_in_game(self) -> bool:
         return bool([ game for game in self.games if not game.ended ])
+    @property
+    def get_active_game(self) -> 'Game':
+        if self.is_in_game:
+            return self.games[-1]

@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 import os, importlib
+import string
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -138,6 +139,9 @@ ICONS_DIR = f'{BASE_DIR}/media/icons/'.replace('\\', '/')
 ICONS_SIZE = (200, 200)
 
 AUTH_USER_MODEL = 'AUTH.User'
+ENABLED_USERNAME_CHARS = string.ascii_letters + string.digits + '_-'
+MAX_USERNAME_LENGTH = 45
+MIN_USERNAME_LENGTH = 1
 
 LEADERS_PORTION = 20
 

@@ -8,10 +8,10 @@ from django.contrib.auth import authenticate, login, logout
 from django.core.cache import cache
 from django.views.decorators.csrf import csrf_protect
 from django.utils.decorators import method_decorator
+from django.conf import settings
 
 from .models import User
 
-import string
 from email_validate import validate
 import secrets
 
@@ -121,22 +121,18 @@ def logout_view(request):
 
 def account_info(request, account_username: str):
     try:
-        return render(request, 'account_info.html', {'account': User.objects.get(username=account_username)})
+        return render(request, 'account_info.html', {'user': request.user, 'account': User.objects.get(username=account_username)})
     except User.DoesNotExist:
         raise Http404('')
 
 
 class FormUtils:
     def is_username(name: str) -> bool:
-        enabled_chars = string.ascii_letters + string.digits + '_-'
-        max_length = 45
-        min_length = 1
-
-        if len(name) > max_length or len(name) < min_length:
+        if len(name) > settings.MAX_USERNAME_LENGTH or len(name) < settings.MIN_USERNAME_LENGTH:
             return False
 
         for char in name:
-            if not char in enabled_chars:
+            if not char in settings.ENABLED_USERNAME_CHARS:
                 return False
 
         return True

@@ -9,9 +9,9 @@ import requests as rq, json
 
 
 def home(request):
-	return render(request, 'home.html')
+	return render(request, 'home.html', {'user': request.user})
 def hello(request):
-    return render(request, 'hello.html')
+    return render(request, 'hello.html', {'user': request.user})
 
 def leaders(request): # Доделать джаваскриптовую подгрузку списка
 	leaders_url = request.build_absolute_uri(f'{reverse("api")}?key=leaders&portion={settings.LEADERS_PORTION}&index=0')
