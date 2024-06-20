@@ -20,14 +20,19 @@ def leaders(request): # Доделать джаваскриптовую подг
 
 def game(request, game_id: int):
 	game = get_object_or_404(Game, id=game_id)
-	if request.user in game.players and not game.ended:
-		return render(request, 'game.html', {
-			'user': request.user,
-			'game': game,
-			'white_player_time': int(game.passed_time('white')),
-			'black_player_time': int(game.passed_time('black')),
-			'max_time': game.max_time*60,
-		})
+	if request.user in game.players:
+		try:
+			return render(request, 'game.html', {
+				'user': request.user,
+				'game': game,
+				'white_player_time': int(game.passed_time('white')),
+				'black_player_time': int(game.passed_time('black')),
+			})
+		except ValueError as ve:
+			if str(ve) == 'The game is ended':
+				return info(request, game_id)
+			else:
+				raise ValueError(ve)
 	else:
 		return redirect('chess:info', game.id)
 

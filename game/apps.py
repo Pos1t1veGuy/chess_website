@@ -154,8 +154,7 @@ class GameConfig(AppConfig):
             asyncio.set_event_loop(loop)
             loop.run_until_complete(self.game_starter())
 
-        thread = threading.Thread(target=start_game_starter_loop, daemon=True)
-        thread.start()
+        threading.Thread(target=start_game_starter_loop, daemon=True).start()
 
         self.resize_pieces_images(settings.PIECES_IMAGES_SIZE, settings.MODIFIED_PIECES_DIR)
         self.create_icons(settings.ICONS_SIZE, settings.ICONS_DIR)

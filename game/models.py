@@ -73,15 +73,10 @@ def if_time_is_not_up(func):
 
 		if self.playing:
 			if self.color == 'white' and self.white_player_time + timedelta >= self.max_time:
-				print(3)
 				self.end(win='black', res='time')
 			elif self.color == 'black' and self.black_player_time + timedelta >= self.max_time:
-				print(4)
 				self.end(win='white', res='time')
-			else:
-				raise ValueError("The game is ended")
-		else:
-			raise ValueError("The game is not started")
+
 		return func(self, *args, **kwargs)
 	return wrapper
 
