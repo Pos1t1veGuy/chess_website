@@ -71,20 +71,16 @@ class GameConfig(AppConfig):
         games_interval = 10
 
         user1_winrate = await sync_to_async(lambda: user1.winrate)()
-        user1_level = await sync_to_async(lambda: user1.winrate)()
-        user1_games_count = await sync_to_async(lambda: user1.winrate)()
+        user1_level = await sync_to_async(lambda: user1.level)()
+        user1_games_count = await sync_to_async(lambda: user1.games_count)()
 
         user2_winrate = await sync_to_async(lambda: user2.winrate)()
-        user2_level = await sync_to_async(lambda: user2.winrate)()
-        user2_games_count = await sync_to_async(lambda: user2.winrate)()
+        user2_level = await sync_to_async(lambda: user2.level)()
+        user2_games_count = await sync_to_async(lambda: user2.games_count)()
 
-        print(1)
         if user1_level - level_interval <= user2_level <= user1_level + level_interval:
-            print(2)
             if user1_winrate - winrate_interval <= user2_winrate <= user1_winrate + winrate_interval:
-                print(3)
                 if user1_games_count - games_interval <= user2_games_count <= user1_games_count + games_interval:
-                    print(4)
                     return True
 
         return False
