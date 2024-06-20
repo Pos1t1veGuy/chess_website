@@ -10,7 +10,7 @@ import asyncio
 import threading
 import json
 import random
-import os, sys
+import os, sys, math
 import signal
 
 shutdown_handlers = []
@@ -88,7 +88,7 @@ class GameConfig(AppConfig):
     async def get_mid_time(self, con1: 'QueueConsumer', con2: 'QueueConsumer') -> int:
         intersection = list( list(set( range(con1.min, con1.max) ) & set( range(con2.min, con2.max) )) )
         if len(intersection) > 0:
-            return sum(intersection)//len(intersection)
+            return math.ceil(sum(intersection)/len(intersection))
 
     async def notice_queue_players(self, con1: 'QueueConsumer', con2: 'QueueConsumer'):
         await con1.send(text_data=json.dumps({
@@ -149,6 +149,7 @@ class GameConfig(AppConfig):
         sys.exit(0)
 
     def ready(self):
+        from .models import Game
         def start_game_starter_loop():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -160,3 +161,7 @@ class GameConfig(AppConfig):
         self.create_icons(settings.ICONS_SIZE, settings.ICONS_DIR)
 
         signal.signal(signal.SIGINT, self.shutdown)
+        if settings.DEBUG:
+            for game in Game.objects.all():
+                if game.ended:
+                    game.delete()

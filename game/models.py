@@ -241,12 +241,7 @@ class Game(models.Model):
 	@if_not_ended_and_started
 	@if_time_is_not_up
 	def give_up(self, color: str, return_json: bool = False):
-		if color == 'white':
-			self.end(win=self.black_player, res='gived_up')
-		elif color == 'black':
-			self.end(win=self.white_player, res='gived_up')
-		else:
-			raise ValueError(f'give_up takes a string, that means losser color, black or white')
+		self.end(win=color, res='gived_up')
 
 	@if_not_ended
 	@if_time_is_not_up
@@ -464,7 +459,7 @@ class Game(models.Model):
 	def end(self, win: str = None, res: str = None):
 		self.end_time = timezone.now()
 
-		if win == 'white':
+		if win == 'white' or win == self.white_player:
 			self.winner = self.white_player
 
 			if self.black_player_score > 0:
@@ -476,7 +471,7 @@ class Game(models.Model):
 				self.white_player_score *= 1.5
 			else:
 				self.white_player_score *= .5
-		elif win == 'black':
+		elif win == 'black' or win == self.black_player:
 			self.winner = self.black_player
 
 			if self.white_player_score > 0:
@@ -490,7 +485,7 @@ class Game(models.Model):
 				self.black_player_score *= .5
 
 		else:
-			self.winner = 'friendship'
+			self.winner = None
 
 		self.ended = True
 		self.playing = False

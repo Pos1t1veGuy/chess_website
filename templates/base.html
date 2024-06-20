@@ -107,6 +107,16 @@
                 let minTime = parseInt(minTimeInput.value)
                 let maxTime = parseInt(maxTimeInput.value)
 
+                if (maxTime > 60) {
+                    maxTimeInput.value = 60
+                } else if (maxTime < 0) {
+                    maxTimeInput.value = 0
+                }
+                if (minTime < 0) {
+                    minTimeInput.value = 0
+                } else if (minTime > 59) {
+                    minTimeInput.value = 59
+                }
                 if (minTime >= maxTime) {
                     minTimeInput.value = maxTime - 1
                 }

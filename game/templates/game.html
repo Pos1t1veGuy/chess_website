@@ -169,7 +169,7 @@
                 <div class="player-avatar" style="background-image: url('{{ game.white_player.avatar.url }}');"></div>
                 <div class="player-name">@{{ game.white_player.username }}</div>
                 <div class="player-info">Счет: <span id="white-score">0</span></div>
-                <div class="player-info">Время: <span id="white-time">0</span> / {{ game.max_time }} сек</div>
+                <div class="player-info">Время: <span id="white-time">0</span> / {{ max_time }} сек</div>
                 <div class="player-info">Уровень: {{ game.white_player.level }}</div>
                 <div class="player-info">Винрейт: {{ game.white_player.winrate }}%</div>
             </div>
@@ -183,7 +183,7 @@
                 <div class="player-avatar" style="background-image: url('{{ game.black_player.avatar.url }}');"></div>
                 <div class="player-name">@{{ game.black_player.username }}</div>
                 <div class="player-info">Счет: <span id="black-score">0</span></div>
-                <div class="player-info">Время: <span id="black-time">0</span> / {{ game.max_time }} сек</div>
+                <div class="player-info">Время: <span id="black-time">0</span> / {{ max_time }} сек</div>
                 <div class="player-info">Уровень: {{ game.black_player.level }}</div>
                 <div class="player-info">Винрейт: {{ game.black_player.winrate }}%</div>
             </div>
@@ -198,6 +198,7 @@
         let last_piece_color
         let highlightedCells = []
         let color
+        let opponent_color
         let opponnent_is_connected = false
         let ws
         let connecting = false
@@ -222,6 +223,7 @@
 
         if (user_id === white_id) {
             color = 'white'
+            opponent_color = 'black'
 
             self_notifications = "left-notifications"
             opponent_notifications = "right-notifications"
@@ -231,6 +233,7 @@
             opponent_time = black_time
         } else {
             color = 'black'
+            opponent_color = 'white'
 
             self_notifications = "right-notifications"
             opponent_notifications = "left-notifications"
@@ -261,29 +264,35 @@
 
                 switch (data.type) {
                     case 'available_positions':
-                        highlight_positions(data.movements)
-                        break
+                        if (!ended) {
+                            highlight_positions(data.movements)
+                            break
+                        }
                     case 'end_info':
+                        ws.close()
+                        ended = true
                         console.log(data.result)
                         break
                     case 'game_info':
-                        current_turn = data.color
-                        updatePieces(data.board)
-                        opponnent_is_connected = data.opponent_info.is_connected
-                        if (!opponnent_is_connected && data.opponent_connected) {
-                            updateNotifications(opponent_notifications, 'Соперник подключился к игре', () => connected && opponnent_is_connected, timeToLive=3000)
-                        } else if (opponnent_is_connected && !data.opponent_connected) {
-                            updateNotifications(opponent_notifications, 'Соперник потерял соединение', () => connected && !opponnent_is_connected)
-                        }
-                        self_time.textContent = data.self_info.time
-                        self_score.textContent = data.self_info.score
+                        if (!ended) {
+                            current_turn = data.color
+                            updatePieces(data.board)
+                            opponnent_is_connected = data.opponent_info.is_connected
+                            if (!opponnent_is_connected && data.opponent_connected) {
+                                updateNotifications(opponent_notifications, 'Соперник подключился к игре', () => connected && opponnent_is_connected, timeToLive=3000)
+                            } else if (opponnent_is_connected && !data.opponent_connected) {
+                                updateNotifications(opponent_notifications, 'Соперник потерял соединение', () => connected && !opponnent_is_connected)
+                            }
+                            self_time.textContent = data.self_info.time
+                            self_score.textContent = data.self_info.score
 
-                        opponent_time.textContent = data.opponent_info.time
-                        opponent_score.textContent = data.opponent_info.score
-                        break
+                            opponent_time.textContent = data.opponent_info.time
+                            opponent_score.textContent = data.opponent_info.score
+                            break
+                        }
                 }
-            };
-        };
+            }
+        }
 
         const ensureWebSocketConnection = () => {
             if ((ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) && !ended) {
@@ -292,100 +301,100 @@
                 connectWebSocket()
                 updateNotifications(self_notifications, 'Переподключение...', () => !connected)
             }
-        }
+        };
 
         const leaveGame = () => {
             ws.send(JSON.stringify({
                 'type': 'user_gave_up'
             }))
-            ws.close()
             ended = true
         }
 
         const createBoard = () => {
-            if (!ended) {
-                const board = document.getElementById('board')
-                let highlightedCell = null
+            const board = document.getElementById('board')
+            let highlightedCell = null
 
-                for (let y = 0; y < 8; y++) {
-                    for (let x = 0; x < 8; x++) {
-                        const cell = document.createElement('div')
-                        let pre_selected_cell
-                        if (color === 'white') {
-                            pre_selected_cell = [x, y]
-                        } else {
-                            pre_selected_cell = [x, Math.abs(y - 7)]
+            for (let y = 0; y < 8; y++) {
+                for (let x = 0; x < 8; x++) {
+                    const cell = document.createElement('div')
+                    let pre_selected_cell
+                    if (color === 'white') {
+                        pre_selected_cell = [x, y]
+                    } else {
+                        pre_selected_cell = [x, Math.abs(y - 7)]
+                    }
+                    cell.className = 'cell'
+                    if (color === 'white') {
+                        if ((x + y) % 2 === 0) {
+                            cell.className += ' black'
                         }
-                        const pre_cell_empty = cell.children.length === 0
-                        let pre_cell_color
-                        if (!pre_cell_empty) {
-                            pre_cell_color = cell.children[0].dataset.color
+                    } else {
+                        if ((x + y) % 2 !== 0) {
+                            cell.className += ' black'
                         }
-                        cell.className = 'cell'
-                        if (color === 'white') {
-                            if ((x + y) % 2 === 0) {
-                                cell.className += ' black'
-                            }
-                        } else {
-                            if ((x + y) % 2 !== 0) {
-                                cell.className += ' black'
-                            }
+                    }
+                    cell.dataset.x = x
+                    cell.dataset.y = y
+                    cell.addEventListener('click', () => {
+                        ensureWebSocketConnection()
+                        if (highlightedCell) {
+                            highlightedCell.classList.remove('highlight')
                         }
-                        cell.dataset.x = x
-                        cell.dataset.y = y
-                        cell.addEventListener('click', () => {
-                            ensureWebSocketConnection()
-                            if (highlightedCell) {
-                                highlightedCell.classList.remove('highlight')
-                            }
-                            cell.classList.add('highlight')
-                            highlightedCell = cell
+                        cell.classList.add('highlight')
+                        highlightedCell = cell
 
-                            if (!is_cell_empty && (pre_cell_empty || pre_cell_color !== last_piece_color) && selected_cell !== pre_selected_cell && last_piece && cell.classList.contains('available')) {
-                                if (color === last_piece.dataset.color) {
-                                    ws.send(JSON.stringify({
-                                        'type': 'movement',
-                                        'from': selected_cell,
-                                        'to': pre_selected_cell,
-                                    }))
-                                    console.log(`Ход с клетки ${pre_selected_cell} до клетки ${selected_cell}, Фигура: ${last_piece.dataset.color} ${last_piece.dataset.type}`)
-                                }
-                            } else if (!(cell.children.length === 0) && cell.children[0].dataset.color === color && current_turn == color) {
+                        let empty_or_enemy
+                        if (cell.children.length === 0) {
+                            empty_or_enemy = true
+                        } else {
+                            empty_or_enemy = cell.children[0].dataset.color === opponent_color
+                            console.log(cell.children.length === 0, '||', cell.children[0].dataset.color === opponent_color)
+                        }
+
+                        if (!is_cell_empty && empty_or_enemy && selected_cell !== pre_selected_cell && last_piece) {
+                            if (color === last_piece.dataset.color) {
                                 ws.send(JSON.stringify({
-                                    'type': 'get_available_movements',
-                                    'position': pre_selected_cell,
+                                    'type': 'movement',
+                                    'from': selected_cell,
+                                    'to': pre_selected_cell,
                                 }))
+                                console.log(`Ход с клетки ${pre_selected_cell} до клетки ${selected_cell}, Фигура: ${last_piece.dataset.color} ${last_piece.dataset.type}`)
                             }
+                        } else if (!(cell.children.length === 0) && cell.children[0].dataset.color === color && current_turn == color) {
+                            ws.send(JSON.stringify({
+                                'type': 'get_available_movements',
+                                'position': pre_selected_cell,
+                            }))
+                        }
 
-                            is_cell_empty = cell.children.length === 0
-                            if (!is_cell_empty) {
-                                last_piece = cell.children[0]
-                                last_piece_color = last_piece.dataset.color
-                            }
+                        is_cell_empty = cell.children.length === 0
+                        if (!is_cell_empty) {
+                            last_piece = cell.children[0]
+                            last_piece_color = last_piece.dataset.color
+                        }
 
-                            if (color === 'white') {
-                                selected_cell = [x, y]
-                            } else {
-                                selected_cell = [x, Math.abs(y - 7)]
-                            }
-                            clear_highlighted()
-                        })
-                        board.appendChild(cell)
-                    }
-                }
-
-                document.body.addEventListener('click', (e) => {
-                    ensureWebSocketConnection()
-                    if (highlightedCell && !e.target.classList.contains('cell')) {
-                        highlightedCell.classList.remove('highlight')
-                        highlightedCell = null
+                        if (color === 'white') {
+                            selected_cell = [x, y]
+                        } else {
+                            selected_cell = [x, Math.abs(y - 7)]
+                        }
                         clear_highlighted()
-                    }
-                }, true)
-                document.body.addEventListener('mousemove', (e) => {
-                    ensureWebSocketConnection()
-                })
+                    })
+                    board.appendChild(cell)
+                }
             }
+
+            document.body.addEventListener('click', (e) => {
+                ensureWebSocketConnection()
+                if (highlightedCell && !e.target.classList.contains('cell')) {
+                    highlightedCell.classList.remove('highlight')
+                    highlightedCell = null
+                    clear_highlighted()
+                }
+            }, true)
+            document.body.addEventListener('mousemove', (e) => {
+                ensureWebSocketConnection()
+            })
         }
 
         const updatePieces = (boardLayout) => {
@@ -418,20 +427,18 @@
         }
 
         const highlight_positions = (movements) => {
-            if (!ended) {
-                clear_highlighted()
-                for (let i = 0; i < movements.length; i++) {
-                    let x = movements[i][0]
-                    let y = movements[i][1]
-                    if (color == 'black') {
-                        x = x
-                        y = Math.abs(y - 7)
-                    }
-                    const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`)
-                    if (cell) {
-                        cell.classList.add('available')
-                        highlightedCells.push(cell)
-                    }
+            clear_highlighted()
+            for (let i = 0; i < movements.length; i++) {
+                let x = movements[i][0]
+                let y = movements[i][1]
+                if (color == 'black') {
+                    x = x
+                    y = Math.abs(y - 7)
+                }
+                const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`)
+                if (cell) {
+                    cell.classList.add('available')
+                    highlightedCells.push(cell)
                 }
             }
         }
@@ -458,6 +465,7 @@
             }
         }
 
+        // подправить movable у королевы
         createBoard()
         connectWebSocket()
     </script>

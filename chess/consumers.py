@@ -219,8 +219,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                     else:
                         await self.send(text_data=json.dumps({'type': "Position is invalid"}))
             case 'user_gave_up':
-                print(1)
-                await game.give_up(game.get_color_by_user(self.user))
+                await sync_to_async(game.give_up)(self.color)
                 await self.lose()
             case 'movement':
                 if 'from' in data.keys() and 'to' in data.keys():
@@ -294,38 +293,64 @@ class GameConsumer(AsyncWebsocketConsumer):
                         }))
 
     async def command_queue(self):
-        global game_consumers_msgs
-
         while 1:
+            game_consumers_msgs = globals().get('game_consumers_msgs', {})
             game = await sync_to_async(lambda: self.user.active_game)()
-            if game.ended:
-                if game.winner == self.user:
-                    self.win()
+            try:
+                if game:
+                    if game.ended:
+                        if game.winner == self.user:
+                            self.win()
+                        else:
+                            self.lose()
                 else:
-                    self.lose()
+                    if game.winner == self.user:
+                        self.win()
+                    else:
+                        self.lose()
+            except AttributeError:
+                self.end = True
 
             if self.end:
                 break
             
             if self.user in game_consumers_msgs.keys():
                 for msg in game_consumers_msgs[self.user]:
-                    await self.send(text_data=json.dumps(msg))
-                    if msg['type'] == 'opponent_losed':
-                        await self.win()
-                    if msg['type'] == 'opponent_won':
-                        await self.lose()
+                    print(2, msg)
+                    if msg['type'] == 'game_info':
+                        print(3)
+                        if msg['result'] == 'win':
+                            print(4)
+                            await self.win(last_msg=True)
+                        if msg['result'] == 'lose':
+                            print(5)
+                            await self.lose(last_msg=True)
+                        print(6)
+                    else:
+                        print(7)
+                        await self.send(text_data=json.dumps(msg))
                     game_consumers_msgs[self.user].remove(msg)
+                    print(8)
             
             await asyncio.sleep(.5)
 
     async def client_comm(self):
         while 1:
             game = await sync_to_async(lambda: self.user.active_game)()
-            if game.ended:
-                if game.winner == self.user:
-                    self.win()
+            try:
+                if game:
+                    if game.ended:
+                        if game.winner == self.user:
+                            self.win()
+                        else:
+                            self.lose()
                 else:
-                    self.lose()
+                    if game.winner == self.user:
+                        self.win()
+                    else:
+                        self.lose()
+            except AttributeError:
+                self.end = True
 
             if self.end:
                 break
@@ -348,14 +373,17 @@ class GameConsumer(AsyncWebsocketConsumer):
             except ValueError as ve:
                 if not str(ve) == 'The game is ended':
                     raise ValueError(ve)
+            except AttributeError as ae:
+                if not str(ae).startswith("'NoneType' object has no attribute"):
+                    raise AttributeError(ae)
 
-            await asyncio.sleep(.5)
+            await asyncio.sleep(.8)
 
     async def send_opponent(self, data: dict):
         global game_consumers_msgs
 
         if self.opponent in game_consumers_msgs.keys():
-            game_consumers_msgs[self.opponent].append(data)
+            game_consumers_msgs[self.opponent] = [ *game_consumers_msgs[self.opponent], data ]
         else:
             game_consumers_msgs[self.opponent] = [data]
 
@@ -363,7 +391,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         global players_in_game
         return self.opponent in players_in_game
 
-    async def lose(self):
+    async def lose(self, last_msg: bool = False):
         await self.send(text_data=json.dumps({
             'type': 'end_info',
             'result': 'lose',
@@ -373,7 +401,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             'result': 'win',
         })
         await self.disconnect(0)
-    async def win(self):
+    async def win(self, last_msg: bool = False):
         await self.send(text_data=json.dumps({
             'type': 'end_info',
             'result': 'win',
