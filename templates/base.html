@@ -56,7 +56,7 @@
                     <form id="time-range-form">
                         <label for="min-time">Минимум минут на игру:</label>
                         <input type="number" id="min-time" name="min-time" min="1" max="60" value="1">
-                        
+                        <br>
                         <label for="max-time">Максимум минут на игру:</label>
                         <input type="number" id="max-time" name="max-time" min="1" max="60" value="10">
                     </form>
@@ -104,8 +104,20 @@
             }
 
             const validateTimeRange = () => {
-                let minTime = parseInt(minTimeInput.value)
-                let maxTime = parseInt(maxTimeInput.value)
+                let minValue = minTimeInput.value
+                let maxValue = maxTimeInput.value
+
+                while (minValue[0] == '0') {
+                    minValue = minValue.slice(1, minValue.length)
+                    minTimeInput.value = minValue
+                }
+                while (maxValue[0] == '0') {
+                    maxValue = maxValue.slice(1, maxValue.length)
+                    maxTimeInput.value = maxValue
+                }
+
+                let minTime = parseInt(minValue)
+                let maxTime = parseInt(maxValue)
 
                 if (maxTime > 60) {
                     maxTimeInput.value = 60

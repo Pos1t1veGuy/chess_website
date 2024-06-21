@@ -293,8 +293,9 @@ class GameConsumer(AsyncWebsocketConsumer):
                         }))
 
     async def command_queue(self):
+        global game_consumers_msgs
+
         while 1:
-            game_consumers_msgs = globals().get('game_consumers_msgs', {})
             game = await sync_to_async(lambda: self.user.active_game)()
             try:
                 if game:
@@ -316,21 +317,14 @@ class GameConsumer(AsyncWebsocketConsumer):
             
             if self.user in game_consumers_msgs.keys():
                 for msg in game_consumers_msgs[self.user]:
-                    print(2, msg)
                     if msg['type'] == 'game_info':
-                        print(3)
                         if msg['result'] == 'win':
-                            print(4)
                             await self.win(last_msg=True)
                         if msg['result'] == 'lose':
-                            print(5)
                             await self.lose(last_msg=True)
-                        print(6)
                     else:
-                        print(7)
                         await self.send(text_data=json.dumps(msg))
                     game_consumers_msgs[self.user].remove(msg)
-                    print(8)
             
             await asyncio.sleep(.5)
 

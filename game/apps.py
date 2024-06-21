@@ -149,7 +149,7 @@ class GameConfig(AppConfig):
         sys.exit(0)
 
     def ready(self):
-        from .models import Game
+        # from .models import Game
         def start_game_starter_loop():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -161,7 +161,7 @@ class GameConfig(AppConfig):
         self.create_icons(settings.ICONS_SIZE, settings.ICONS_DIR)
 
         signal.signal(signal.SIGINT, self.shutdown)
-        if settings.DEBUG:
-            for game in Game.objects.all():
-                if game.ended:
-                    game.delete()
+        # if settings.DEBUG:
+        #     for game in Game.objects.all():
+        #         if game.ended:
+        #             game.delete()
