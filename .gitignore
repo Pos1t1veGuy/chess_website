@@ -2,5 +2,5 @@
 *.json
 __pycache__*
 migrations*
-modified_pieces*
-icons*
+media/modified_pieces
+media/icons
