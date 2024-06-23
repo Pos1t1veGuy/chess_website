@@ -220,6 +220,8 @@
         let opponent_time
         let self_notifications
         let opponent_notifications
+        let self_check
+        let opponent_check
 
         if (user_id === white_id) {
             color = 'white'
@@ -288,6 +290,9 @@
 
                             opponent_time.textContent = data.opponent_info.time
                             opponent_score.textContent = data.opponent_info.score
+
+                            self_check = data.self_info.check
+                            opponent_check = data.opponent_info.check
                             break
                         }
                 }

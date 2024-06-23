@@ -156,6 +156,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                 self.end = False
 
                 self.color = await sync_to_async(game.get_color_by_user)(self.user)
+                self.opponent_color = 'black' if self.color == 'white' else 'white'
                 self.opponent = await sync_to_async(game.get_opponent_user)(self.user)
 
                 await self.send_opponent({'type':'opponent_is_connected'})
@@ -209,7 +210,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                                         }))
                                     else:
                                         await self.send(text_data=json.dumps({
-                                            'type': f"You can not move { 'black' if self.color == 'white' else 'white' } pieces"
+                                            'type': f"You can not move {self.opponent_color} pieces"
                                         }))
                                 else:
                                     await self.send(text_data=json.dumps({'type': "Position is invalid"}))
@@ -236,7 +237,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                                             await self.send(text_data=json.dumps({'type': str(e)}))
                                     else:
                                         await self.send(text_data=json.dumps({
-                                            'type': f"You can not move { 'black' if self.color == 'white' else 'white' } pieces"
+                                            'type': f"You can not move {self.opponent_color} pieces"
                                         }))
                                 else:
                                     await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
@@ -270,7 +271,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                                             }))
                                     else:
                                         await self.send(text_data=json.dumps({
-                                            'type': f"You can not move { 'black' if self.color == 'white' else 'white' } pieces"
+                                            'type': f"You can not move {self.opponent_color} pieces"
                                         }))
                                 else:
                                     await self.send(text_data=json.dumps({'type': "Position is invalid"}))
@@ -319,14 +320,20 @@ class GameConsumer(AsyncWebsocketConsumer):
             game = await sync_to_async(lambda: self.user.active_game)()
             
             try:
+                self_check = False
+                opponent_check = False
                 if any([ king.checkmate for king in self.game.kings ]):
                     king = [ king for king in self.game.kings if king.checkmate ][0]
                     if king.color == self.color:
                         self.lose(last_msg=True)
                     else:
                         self.win(last_msg=True)
-                if any([ king.mate for king in self.game.kings ]):
+                elif any([ king.mate for king in self.game.kings ]):
                     self.stalemate(last_msg=True)
+                elif any([ king.check for king in self.game.kings ]):
+                    kings = [ king for king in self.game.kings if king.checkmate ]
+                    self_check = self.color in [ king.color for king in kings ]
+                    opponent_check = self.opponent_color in [ king.color for king in kings ]
 
                 await self.send(text_data=json.dumps({
                     'type': "game_info",
@@ -334,12 +341,14 @@ class GameConsumer(AsyncWebsocketConsumer):
                     'board': game.movements[-1],
                     'opponent_info': {
                         'is_connected': await self.is_opponent_alive(),
-                        'time': await sync_to_async(game.passed_time)('white' if self.color == 'black' else 'black'),
+                        'time': await sync_to_async(game.passed_time)(self.opponent_color),
                         'score': await sync_to_async(lambda: (game.white_player_score if self.color == 'black' else game.black_player_score))(),
+                        'check': opponent_check,
                     },
                     'self_info': {
                         'time': await sync_to_async(game.passed_time)(self.color),
                         'score': await sync_to_async(lambda: (game.white_player_score if self.color == 'white' else game.black_player_score))(),
+                        'check': self_check,
                     }
                 }))
             except ValueError as ve:
