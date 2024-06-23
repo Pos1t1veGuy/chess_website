@@ -176,7 +176,9 @@ class GameConfig(AppConfig):
         is_different_index = settings.FILE_CACHE['pieces', 'images_hash'] != self.image_dataset_hash(settings.PIECES_DIR)
         is_dirs = os.path.isdir(settings.ICONS_DIR) and os.path.isdir(settings.MODIFIED_PIECES_DIR)
         is_not_all_pieces = len(os.listdir(settings.PIECES_DIR)) != len(os.listdir(settings.MODIFIED_PIECES_DIR))
-        is_different_sizes = settings.FILE_CACHE['pieces', 'images_size'] != settings.PIECES_IMAGES_SIZE or settings.FILE_CACHE['pieces', 'icons_size'] != settings.ICONS_SIZE
+        is_different_sizes = list(
+            settings.FILE_CACHE['pieces', 'images_size']
+        ) != list(settings.PIECES_IMAGES_SIZE) or list(settings.FILE_CACHE['pieces', 'icons_size']) != list(settings.ICONS_SIZE)
 
         if is_different_index or is_different_names or not is_dirs or is_not_all_pieces or is_different_sizes or settings.UPDATE_PIECES_IMAGES:
             print('Making pieces icons...')

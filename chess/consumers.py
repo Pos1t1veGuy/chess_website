@@ -315,7 +315,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             if self.end:
                 break
             
-            print(game_consumers_msgs)
+            print(123, game_consumers_msgs)
             if self.user in game_consumers_msgs.keys():
                 for msg in game_consumers_msgs[self.user]:
                     if msg['type'] == 'game_info':
