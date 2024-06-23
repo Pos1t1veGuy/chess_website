@@ -1,4 +1,10 @@
 db.sqlite3
 bu.sqlite3
+cache.json
+AUTH/__pycache__
+AUTH/migrations
+chess/__pycache__
+game/__pycache__
+game/migrations
 media/modified_pieces
 media/icons
