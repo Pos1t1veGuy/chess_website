@@ -149,6 +149,7 @@ LEADERS_PORTION = 20
 PIECES_IMAGES_SIZE = (180, 180)
 MODIFIED_PIECES_DIR = f'{BASE_DIR}/media/modified_pieces/'.replace('\\', '/')
 PIECES_DIR = f'{BASE_DIR}/media/pieces/'.replace('\\', '/')
+UPDATE_PIECES_IMAGES = False
 
 FILE_CACHE = ProjectCache(f'{BASE_DIR}/cache.json', default_content={
     "pieces": {
