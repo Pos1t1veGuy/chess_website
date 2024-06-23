@@ -1,6 +1,6 @@
 *.sqlite3
 *.json
-**/__pycache__
-**/migrations
-**/modified_pieces
-**/icons
+__pycache__*
+migrations*
+modified_pieces*
+icons*
