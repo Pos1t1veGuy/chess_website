@@ -164,7 +164,6 @@ class GameConfig(AppConfig):
 
         from .models import Game
 
-        print('Starting game starter loop...')
         def start_game_starter_loop():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)

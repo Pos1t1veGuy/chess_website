@@ -7,6 +7,7 @@ from AUTH.models import User
 from game.models import Game
 from game.pieces import string_pieces
 import traceback
+import functools
 
 
 queue_consumers = []
@@ -297,25 +298,6 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         while 1:
             game = await sync_to_async(lambda: self.user.active_game)()
-            try:
-                if game:
-                    if game.ended:
-                        if game.winner == self.user:
-                            self.win()
-                        else:
-                            self.lose()
-                else:
-                    if game.winner == self.user:
-                        self.win()
-                    else:
-                        self.lose()
-            except AttributeError:
-                self.end = True
-
-            if self.end:
-                break
-            
-            print(123, game_consumers_msgs)
             if self.user in game_consumers_msgs.keys():
                 for msg in game_consumers_msgs[self.user]:
                     if msg['type'] == 'game_info':
@@ -329,28 +311,23 @@ class GameConsumer(AsyncWebsocketConsumer):
             
             await asyncio.sleep(.5)
 
+            if self.end:
+                break
+
     async def client_comm(self):
         while 1:
             game = await sync_to_async(lambda: self.user.active_game)()
-            try:
-                if game:
-                    if game.ended:
-                        if game.winner == self.user:
-                            self.win()
-                        else:
-                            self.lose()
-                else:
-                    if game.winner == self.user:
-                        self.win()
-                    else:
-                        self.lose()
-            except AttributeError:
-                self.end = True
-
-            if self.end:
-                break
             
             try:
+                if any([ king.checkmate for king in self.game.kings ]):
+                    king = [ king for king in self.game.kings if king.checkmate ][0]
+                    if king.color == self.color:
+                        self.lose(last_msg=True)
+                    else:
+                        self.win(last_msg=True)
+                if any([ king.mate for king in self.game.kings ]):
+                    self.stalemate(last_msg=True)
+
                 await self.send(text_data=json.dumps({
                     'type': "game_info",
                     'color': game.color,
@@ -372,17 +349,18 @@ class GameConsumer(AsyncWebsocketConsumer):
                 if not str(ae).startswith("'NoneType' object has no attribute"):
                     raise AttributeError(ae)
 
+            if self.end:
+                break
+
             await asyncio.sleep(.8)
 
     async def send_opponent(self, data: dict):
         global game_consumers_msgs
 
-        print('BEFORE', game_consumers_msgs)
         if self.opponent in game_consumers_msgs.keys():
             game_consumers_msgs[self.opponent] = [ *game_consumers_msgs[self.opponent], data ]
         else:
             game_consumers_msgs[self.opponent] = [data]
-        print('AFTER', game_consumers_msgs)
 
     async def is_opponent_alive(self):
         global players_in_game
@@ -393,20 +371,33 @@ class GameConsumer(AsyncWebsocketConsumer):
             'type': 'end_info',
             'result': 'lose',
         }))
-        await self.send_opponent({
-            'type': 'end_info',
-            'result': 'win',
-        })
+        if last_msg:
+            await self.send_opponent({
+                'type': 'end_info',
+                'result': 'win',
+            })
         await self.disconnect(0)
     async def win(self, last_msg: bool = False):
         await self.send(text_data=json.dumps({
             'type': 'end_info',
             'result': 'win',
         }))
-        await self.send_opponent({
+        if last_msg:
+            await self.send_opponent({
+                'type': 'end_info',
+                'result': 'lose',
+            })
+        await self.disconnect(0)
+    async def stalemate(self, last_msg: bool = False):
+        await self.send(text_data=json.dumps({
             'type': 'end_info',
-            'result': 'lose',
-        })
+            'result': 'stalemate',
+        }))
+        if last_msg:
+            await self.send_opponent({
+                'type': 'end_info',
+                'result': 'stalemate',
+            })
         await self.disconnect(0)
 
     async def get_score(self) -> int:

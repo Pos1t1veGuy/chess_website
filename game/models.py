@@ -669,6 +669,9 @@ class Game(models.Model):
 	def lost_pieces_by_color(self, color: str) -> list:
 		return [ eval(f"{piece.split(' ')[0]}('{piece.split(' ')[1]}')") for piece in self.lost_pieces if piece.split(' ')[1] == color ]
 
+	def get_king_by_color(self):
+		return [ king for king in self.kings if king.color == color]
+
 	@property
 	def color(self) -> str:
 		if len(self.movements) % 2:
@@ -679,6 +682,17 @@ class Game(models.Model):
 	@property
 	def movement_count(self) -> int:
 		return len(self.movements)-1
+
+	@property
+	def kings(self):
+		return [ piece for piece in self.alive_pieces if isinstance(piece, King) ]
+
+	@property
+	def black_king(self):
+		return [ king for king in self.kings if king.color == 'black']
+	@property
+	def white_king(self):
+		return [ king for king in self.kings if king.color == 'white']
 
 	@property
 	def alive_pieces(self) -> list:
