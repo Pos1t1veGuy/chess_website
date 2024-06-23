@@ -146,14 +146,16 @@ MIN_USERNAME_LENGTH = 1
 
 LEADERS_PORTION = 20
 
-PIECES_IMAGES_SIZE = (180, 180)
+PIECES_IMAGES_SIZE = (250, 250)
 MODIFIED_PIECES_DIR = f'{BASE_DIR}/media/modified_pieces/'.replace('\\', '/')
 PIECES_DIR = f'{BASE_DIR}/media/pieces/'.replace('\\', '/')
 UPDATE_PIECES_IMAGES = False
 
 FILE_CACHE = ProjectCache(f'{BASE_DIR}/cache.json', default_content={
     "pieces": {
-        "images_hash": 0,
+        "images_hash": "",
         "images_names": [],
+        "images_size": list(PIECES_IMAGES_SIZE),
+        "icons_size": list(PIECES_IMAGES_SIZE),
     }
 })

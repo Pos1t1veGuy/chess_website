@@ -121,12 +121,14 @@ class GameConfig(AppConfig):
         if os.path.isdir(result_dir):
             rmtree(result_dir)
         os.mkdir(result_dir)
-        shutdown_handlers.append(lambda: rmtree(result_dir) if os.path.isdir(result_dir) else ...)
+        if settings.UPDATE_PIECES_IMAGES:
+            shutdown_handlers.append(lambda: rmtree(result_dir) if os.path.isdir(result_dir) else ...)
 
         for obj in os.listdir(settings.PIECES_DIR):
             if obj.split('.')[-1] == 'png' and obj.split('_')[0] in ['white', 'black']:
                 image = Image.open(settings.PIECES_DIR + obj)
-                image.save(result_dir + obj, sizes=[size])
+                image.thumbnail(size)
+                image.save(result_dir + obj)
 
     def create_icons(self, size: List[int], result_dir: str):
         global shutdown_handlers
@@ -134,7 +136,8 @@ class GameConfig(AppConfig):
         if os.path.isdir(result_dir):
             rmtree(result_dir)
         os.mkdir(result_dir)
-        shutdown_handlers.append(lambda: rmtree(result_dir) if os.path.isdir(result_dir) else ...)
+        if settings.UPDATE_PIECES_IMAGES:
+            shutdown_handlers.append(lambda: rmtree(result_dir) if os.path.isdir(result_dir) else ...)
 
         for obj in os.listdir(settings.MODIFIED_PIECES_DIR):
             if obj.split('.')[-1] == 'png':
@@ -171,13 +174,19 @@ class GameConfig(AppConfig):
 
         is_different_names = settings.FILE_CACHE['pieces', 'images_names'] != os.listdir(settings.PIECES_DIR)
         is_different_index = settings.FILE_CACHE['pieces', 'images_hash'] != self.image_dataset_hash(settings.PIECES_DIR)
-        if is_different_index or is_different_names:
+        is_dirs = os.path.isdir(settings.ICONS_DIR) and os.path.isdir(settings.MODIFIED_PIECES_DIR)
+        is_not_all_pieces = len(os.listdir(settings.PIECES_DIR)) != len(os.listdir(settings.MODIFIED_PIECES_DIR))
+        is_different_sizes = settings.FILE_CACHE['pieces', 'images_size'] != settings.PIECES_IMAGES_SIZE or settings.FILE_CACHE['pieces', 'icons_size'] != settings.ICONS_SIZE
+
+        if is_different_index or is_different_names or not is_dirs or is_not_all_pieces or is_different_sizes or settings.UPDATE_PIECES_IMAGES:
             print('Making pieces icons...')
             self.resize_pieces_images(settings.PIECES_IMAGES_SIZE, settings.MODIFIED_PIECES_DIR)
             self.create_icons(settings.ICONS_SIZE, settings.ICONS_DIR)
 
             settings.FILE_CACHE['pieces', 'images_names'] = os.listdir(settings.PIECES_DIR)
             settings.FILE_CACHE['pieces', 'images_hash'] = self.image_dataset_hash(settings.PIECES_DIR)
+            settings.FILE_CACHE['pieces', 'images_size'] = settings.PIECES_IMAGES_SIZE
+            settings.FILE_CACHE['pieces', 'icons_size'] = settings.ICONS_SIZE
 
         signal.signal(signal.SIGINT, self.shutdown)
         if settings.DEBUG:

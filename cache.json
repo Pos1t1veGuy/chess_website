@@ -14,6 +14,14 @@
       "white_pawn.png",
       "white_queen.png",
       "white_rook.png"
+    ],
+    "images_size": [
+      250,
+      250
+    ],
+    "icons_size": [
+      200,
+      200
     ]
   }
 }
