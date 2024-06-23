@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import os, importlib
 import string
+from .file_cacher import Cache as ProjectCache
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -145,6 +146,13 @@ MIN_USERNAME_LENGTH = 1
 
 LEADERS_PORTION = 20
 
-PIECES_IMAGES_SIZE =(180, 180)
+PIECES_IMAGES_SIZE = (180, 180)
 MODIFIED_PIECES_DIR = f'{BASE_DIR}/media/modified_pieces/'.replace('\\', '/')
 PIECES_DIR = f'{BASE_DIR}/media/pieces/'.replace('\\', '/')
+
+FILE_CACHE = ProjectCache(f'{BASE_DIR}/cache.json', default_content={
+    "pieces": {
+        "images_hash": 0,
+        "images_names": [],
+    }
+})

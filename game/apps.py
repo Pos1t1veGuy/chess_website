@@ -12,6 +12,7 @@ import json
 import random
 import os, sys, math
 import signal
+import imagehash
 
 shutdown_handlers = []
 
@@ -140,6 +141,12 @@ class GameConfig(AppConfig):
                 image = Image.open(settings.MODIFIED_PIECES_DIR + obj)
                 image.save(result_dir + '.'.join(obj.split('.')[:-1]) + '.ico', format='ICO', sizes=[size])
 
+    def image_dataset_hash(self, path: str) -> int:
+        res = []
+        for im in os.listdir(path):
+            res.append( str(imagehash.phash(Image.open(path + im))) )
+        return '-'.join(res)
+
     def shutdown(self, signum, frame):
         global shutdown_handlers
 
@@ -149,7 +156,12 @@ class GameConfig(AppConfig):
         sys.exit(0)
 
     def ready(self):
-        # from .models import Game
+        if os.environ.get('RUN_MAIN', None) != 'true':
+            return # without it GameConfig.ready calls twice
+
+        from .models import Game
+
+        print('Starting game starter loop...')
         def start_game_starter_loop():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -157,11 +169,18 @@ class GameConfig(AppConfig):
 
         threading.Thread(target=start_game_starter_loop, daemon=True).start()
 
-        self.resize_pieces_images(settings.PIECES_IMAGES_SIZE, settings.MODIFIED_PIECES_DIR)
-        self.create_icons(settings.ICONS_SIZE, settings.ICONS_DIR)
+        is_different_names = settings.FILE_CACHE['pieces', 'images_names'] != os.listdir(settings.PIECES_DIR)
+        is_different_index = settings.FILE_CACHE['pieces', 'images_hash'] != self.image_dataset_hash(settings.PIECES_DIR)
+        if is_different_index or is_different_names:
+            print('Making pieces icons...')
+            self.resize_pieces_images(settings.PIECES_IMAGES_SIZE, settings.MODIFIED_PIECES_DIR)
+            self.create_icons(settings.ICONS_SIZE, settings.ICONS_DIR)
+
+            settings.FILE_CACHE['pieces', 'images_names'] = os.listdir(settings.PIECES_DIR)
+            settings.FILE_CACHE['pieces', 'images_hash'] = self.image_dataset_hash(settings.PIECES_DIR)
 
         signal.signal(signal.SIGINT, self.shutdown)
-        # if settings.DEBUG:
-        #     for game in Game.objects.all():
-        #         if game.ended:
-        #             game.delete()
+        if settings.DEBUG:
+            for game in Game.objects.all():
+                if game.ended:
+                    game.delete()

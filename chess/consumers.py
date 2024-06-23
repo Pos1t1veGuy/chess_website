@@ -315,6 +315,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             if self.end:
                 break
             
+            print(game_consumers_msgs)
             if self.user in game_consumers_msgs.keys():
                 for msg in game_consumers_msgs[self.user]:
                     if msg['type'] == 'game_info':
@@ -376,10 +377,12 @@ class GameConsumer(AsyncWebsocketConsumer):
     async def send_opponent(self, data: dict):
         global game_consumers_msgs
 
+        print('BEFORE', game_consumers_msgs)
         if self.opponent in game_consumers_msgs.keys():
             game_consumers_msgs[self.opponent] = [ *game_consumers_msgs[self.opponent], data ]
         else:
             game_consumers_msgs[self.opponent] = [data]
+        print('AFTER', game_consumers_msgs)
 
     async def is_opponent_alive(self):
         global players_in_game
