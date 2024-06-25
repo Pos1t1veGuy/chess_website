@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     <title>Шахматная доска</title>
     <style>
         body {
@@ -206,10 +207,12 @@
         let connecting = false
         let connected = false
         let ended = false
+        let opponent_want_to_revenge = false
+        let want_to_revenge = false
 
         const user_id = {{ user.id }}
         const white_id = {{ game.white_player.id }}
-        const home_url = {% url 'chess:home' %}
+        const home_url = "{% url 'chess:home' %}"
         const mirrored = white_id !== user_id
 
         const white_score = document.getElementById('white-score')
@@ -225,7 +228,6 @@
         let opponent_notifications
         let self_check
         let opponent_check
-        let end_result
 
         if (user_id === white_id) {
             color = 'white'
@@ -271,7 +273,47 @@
                 switch (data.type) {
                     case 'end_info':
                         ended = true
-                        end_result = data.result
+                        Swal.fire({
+                            title: data.result === 'win' ? 'Победа' : 'Поражение',
+                            html: `
+                            <div style="user-select: none">
+                                <p>Заработано очков: ${data.score}</p>
+                                <p>Время: ${data.time} / {{ max_time }}</p>
+                                <p>Количество ходов: ${data.movement_count}</p>
+                                <p>Цвет игрока: ${color == 'white' ? 'Белый' : 'Черный'}</p>
+                                <p>Потеряно своих фигур: ${data.lost_pieces}; Ценность: ${data.lost_price}</p>
+                                <p>Съедено вражеских фигур: ${data.opponent_lost_pieces}; Ценность: ${data.opponent_lost_price}</p>
+                                <p id="opponent_message"></p>
+                            </div>
+                            `,
+                            showCancelButton: true,
+                            confirmButtonText: 'Предложить реванш',
+                            cancelButtonText: 'На главную',
+                            preConfirm: () => {
+                                return false
+                            },
+                            willOpen: () => {
+                                const confirmButton = Swal.getConfirmButton()
+                                confirmButton.addEventListener('click', () => {
+                                    ws.send(JSON.stringify({ 'type': 'want_to_revenge' }))
+                                    confirmButton.disabled = true
+                                    confirmButton.style.backgroundColor = 'gray'
+
+                                    const message = document.getElementById('opponent_message')
+                                    if (opponent_want_to_revenge) {
+                                        message.textContent = 'Реванш подтвержден'
+                                    } else {
+                                        message.textContent = 'Ожидаем ответа противника...'
+                                    }
+                                    want_to_revenge = true
+                                })
+                            }
+                        }).then((result) => {
+                            if (!result.isConfirmed) {
+                                ws.close()
+                                window.location.href = home_url
+                            }
+                        })
                         break
                     case 'game_info':
                         if (!ended) {
@@ -292,13 +334,45 @@
                             self_check = data.self_info.check
                             opponent_check = data.opponent_info.check
                             break
+                        } else if (data.game_id) {
+                            console.log('game is ready')
+                            window.location.href = get_game_url(data.game_id)
                         }
                     case 'available_movements':
                         available_movements = data.movements
                         available_positions = data.positions
                         break
+                    case 'opponent_want_to_revenge':
+                        const message = document.getElementById('opponent_message')
+                        if (want_to_revenge) {
+                            message.textContent = 'Противник согласен на реванш'
+                        } else {
+                            message.textContent = 'Противник требует реванша'
+                        }
+                        opponent_want_to_revenge = true
+                        break
+                    case 'opponent_is_disconnected':
+                        if (ended) {
+                            const message = document.getElementById('opponent_message')
+                            message.textContent = 'Противник покинул игру'
+                        } else {
+                            updateNotifications(opponent_notifications, 'Соперник покинул игру', () => !opponnent_is_connected)
+                        }
+                        break
+                    case 'opponent_is_connected':
+                        if (ended) {
+                            const message = document.getElementById('opponent_message')
+                            message.textContent = 'Соперник подключился к игре'
+                        } else {
+                            updateNotifications(opponent_notifications, 'Соперник подключился к игре', () => connected && opponnent_is_connected, timeToLive=3000)
+                        }
+                        break
                 }
             }
+        }
+
+        const get_game_url = (game_id) => {
+            return `/games/${game_id}`
         }
 
         const ensureWebSocketConnection = () => {
@@ -471,36 +545,6 @@
             } else {
                 notifications.style.display = 'none'
             }
-        }
-
-        const finish_game = () => {
-            Swal.fire({
-                title: end_result === 'win' ? 'Победа' : 'Поражение',
-                html: `
-                <div style="user-select: none">
-                    <p>Заработано очков: ${0}</p>
-                </div>
-                `,
-                showCancelButton: true,
-                confirmButtonText: 'Реванш',
-                cancelButtonText: 'На главную',
-                preConfirm: () => {
-                    return false
-                },
-                willOpen: () => {
-                    const confirmButton = Swal.getConfirmButton()
-                    confirmButton.addEventListener('click', () => {
-                        ws.send(JSON.stringify({ 'type': 'want_to_revenge' }))
-                        confirmButton.disabled = true
-                        confirmButton.style.backgroundColor = 'gray'
-                    })
-                }
-            }).then((result) => {
-                if (!result.isConfirmed) {
-                    ws.close()
-                    window.location.href = home_url
-                }
-            })
         }
 
         // подправить movable у королевы

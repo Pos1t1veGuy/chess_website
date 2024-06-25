@@ -21,6 +21,22 @@ class GameConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'game'
     queue_consumers = []
+    revengers = {}
+
+    async def game_revenger(self):
+        while True:
+            from chess.consumers import revengers
+            self.revengers = revengers
+
+            for game, consumers in self.revengers.items():
+                if len(consumers) > 2:
+                    del self.revengers[game]
+                elif len(consumers) == 2:
+                    await asyncio.sleep(1)
+                    await self.start_game(consumers[0], consumers[1], game.max_time/60)
+                    del self.revengers[game]
+
+            await asyncio.sleep(1)
 
     async def game_starter(self):
         from AUTH.models import User
@@ -54,16 +70,15 @@ class GameConfig(AppConfig):
 
     async def start_game(self, white: 'QueueConsumer', black: 'QueueConsumer', time: int):
         from .models import Game
-        game = await sync_to_async(Game.objects.create)(white_player=white.user, black_player=black.user, max_time=time * 60)
+        game = await sync_to_async(Game.objects.create)(white_player=white.user, black_player=black.user, max_time=int(time * 60))
         await sync_to_async(game.save)()
 
         for con in [white, black]:
-            if con in self.queue_consumers:
-                await con.send(text_data=json.dumps({
-                    'type': 'game_info',
-                    'game_id': game.id,
-                }))
-                await con.disconnect(0)
+            await con.send(text_data=json.dumps({
+                'type': 'game_info',
+                'game_id': game.id,
+            }))
+            await con.disconnect(0)
 
     async def similar_players(self, user1: 'User', user2: 'User') -> bool:
         # it means values in (user.value - interval -> user.value + interval)
@@ -164,12 +179,18 @@ class GameConfig(AppConfig):
 
         from .models import Game
 
+        print('Starting background game tasks...')
         def start_game_starter_loop():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             loop.run_until_complete(self.game_starter())
+        def start_game_revenger_loop():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.game_revenger())
 
         threading.Thread(target=start_game_starter_loop, daemon=True).start()
+        threading.Thread(target=start_game_revenger_loop, daemon=True).start()
 
         is_different_names = settings.FILE_CACHE['pieces', 'images_names'] != os.listdir(settings.PIECES_DIR)
         is_different_index = settings.FILE_CACHE['pieces', 'images_hash'] != self.image_dataset_hash(settings.PIECES_DIR)

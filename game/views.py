@@ -27,6 +27,7 @@ def game(request, game_id: int):
 				'game': game,
 				'white_player_time': int(game.passed_time('white')),
 				'black_player_time': int(game.passed_time('black')),
+				'max_time': game.max_time
 			})
 		except ValueError as ve:
 			if str(ve) == 'The game is ended':
