@@ -61,7 +61,7 @@
                         <input type="number" id="max-time" name="max-time" min="1" max="60" value="10">
                     </form>
                     <div id="timer-menu">
-                        <p>Таймер: <span id="timer">0:00</span></p>
+                        <p>Таймер: <span id="search-timer">0:00</span></p>
 
                         <p>Людей в очереди: <span id="queue-count">0</span></p>
                         Средняя статистика игроков:
@@ -82,12 +82,16 @@
     <script>
         {% if not user.is_in_game %}
             let ws
-            let timerInterval = null
-            let seconds
+            let search_timerInterval
+            let search_seconds
+            let wait_seconds
+            let wait_timerInterval
+
+            const max_wait_time = 15
 
             const start_button = document.querySelector("#start-game-button")
             const timerElement = document.getElementById("timer-menu")
-            const timerSpan = document.getElementById("timer")
+            const search_timerSpan = document.getElementById("search-timer")
             const queue_count_info = document.getElementById('queue-count')
             const games_count_info = document.getElementById('games-count')
             const winrate_info = document.getElementById('winrate')
@@ -174,6 +178,8 @@
                             Swal.fire({
                                 title: 'Подтвердите готовность',
                                 html: `
+                                <div style="user-select: none">
+                                    <p>Осталось <span id="wait-timer">${max_wait_time}</span> секунд</p>
                                     <p>Время игры: ${formattedTime}</p>
                                     <p>Ваш соперник:</p>
                                     ${getSafeValue(data.opponent.avatar) ? `<img src="${data.opponent.avatar}" alt="Аватарка соперника" width="100" height="100">` : ''}
@@ -181,6 +187,7 @@
                                     <p>Имя: ${getSafeValue(data.opponent.name, 'Неизвестно')}</p>
                                     <p>Уровень: ${getSafeValue(data.opponent.level, 'Неизвестно')}</p>
                                     <p>Winrate: ${data.opponent.winrate != undefined ? data.opponent.winrate + '%' : 'Неизвестно'}</p>
+                                </div>
                                 `,
                                 showCancelButton: true,
                                 confirmButtonText: 'Играть',
@@ -194,24 +201,38 @@
                                         ws.send(JSON.stringify({ 'type': 'i_am_ready' }))
                                         confirmButton.disabled = true
                                         confirmButton.style.backgroundColor = 'gray'
-                                    });
+                                    })
                                 }
                             }).then((result) => {
-                                if (result.isConfirmed) {
-                                    ws.send(JSON.stringify( {'type': 'i_am_ready'} ))
-                                    console.log('agreed')
-                                } else {
+                                if (!result.isConfirmed) {
                                     ws.send(JSON.stringify( {'type': 'cancel_game'} ))
                                     console.log('game is canceled')
-                                    start_timer(seconds)
+                                    start_timer(search_seconds)
                                 }
+                                clearInterval(wait_timerInterval)
+                                wait_seconds = 0
                             })
+                            wait_seconds = max_wait_time
+                            wait_timerInterval = setInterval(() => {
+                                const wait_timerSpan = document.getElementById("wait-timer")
+
+                                wait_seconds--
+                                wait_timerSpan.textContent = wait_seconds
+
+                                if (wait_seconds <= 0) {
+                                    console.log('game is canceled')
+                                    Swal.close()
+                                    start_timer(search_seconds)
+                                    wait_seconds = 0
+                                    ws.close()
+                                }
+                            }, 1000)
                             break
 
                         case 'game_is_canceled':
                             console.log('game is canceled')
                             Swal.close()
-                            start_timer(seconds)
+                            start_timer(search_seconds)
                             break
 
                         case 'opponent_is_ready':
@@ -246,24 +267,24 @@
                     ws.close()
                 }
                 timerElement.style.display = "none"
-                timerSpan.textContent = "0"
+                search_timerSpan.textContent = "0"
                 stop_timer()
             }
 
             const start_timer = (sec = 0) => {
-                seconds = sec
-                if (timerInterval != null) {
-                    clearInterval(timerInterval)
+                search_seconds = sec
+                if (search_timerInterval != null) {
+                    clearInterval(search_timerInterval)
                 }
-                timerInterval = setInterval(() => {
-                    seconds++
-                    const mins = Math.floor(seconds / 60)
-                    const secs = seconds % 60
-                    timerSpan.textContent = `${mins}:${secs < 10 ? `0${secs}` : secs}`
+                search_timerInterval = setInterval(() => {
+                    search_seconds++
+                    const mins = Math.floor(search_seconds / 60)
+                    const secs = search_seconds % 60
+                    search_timerSpan.textContent = `${mins}:${secs < 10 ? `0${secs}` : secs}`
                 }, 1000)
             }
             const stop_timer = () => {
-                clearInterval(timerInterval)
+                clearInterval(search_timerInterval)
             }
         {% else %}
             const continue_game = () => {

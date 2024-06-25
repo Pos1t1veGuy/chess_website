@@ -12,7 +12,9 @@ import functools
 
 queue_consumers = []
 game_consumers_msgs = {}
-players_in_game = [] 
+players_in_game = []
+players_in_game = []
+
 
 class QueueConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -194,6 +196,8 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         match mtype:
             case 'user_gave_up':
+                if not game.playing:
+                    await sync_to_async(game.start)()
                 await sync_to_async(game.give_up)(self.color)
                 await self.lose()
             case 'movement':
@@ -299,11 +303,11 @@ class GameConsumer(AsyncWebsocketConsumer):
                 if any([ king.checkmate for king in kings ]):
                     king = [ king for king in kings if king.checkmate ][0]
                     if king.color == self.color:
-                        await self.lose(last_msg=True)
+                        await self.lose()
                     else:
-                        await self.win(last_msg=True)
+                        await self.win()
                 elif any([ king.mate for king in kings ]):
-                    await self.stalemate(last_msg=True)
+                    await self.stalemate()
                 elif any([ king.check for king in kings ]):
                     self_check = self.color in [ king.color for king in kings if king.check ]
                     opponent_check = self.opponent_color in [ king.color for king in kings if king.check ]
@@ -362,7 +366,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             'type': 'end_info',
             'result': 'lose',
         }))
-        if last_msg:
+        if not last_msg:
             await self.send_opponent({
                 'type': 'end_info',
                 'result': 'win',
@@ -373,7 +377,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             'type': 'end_info',
             'result': 'win',
         }))
-        if last_msg:
+        if not last_msg:
             await self.send_opponent({
                 'type': 'end_info',
                 'result': 'lose',
@@ -384,7 +388,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             'type': 'end_info',
             'result': 'stalemate',
         }))
-        if last_msg:
+        if not last_msg:
             await self.send_opponent({
                 'type': 'end_info',
                 'result': 'stalemate',

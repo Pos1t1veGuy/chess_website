@@ -209,6 +209,7 @@
 
         const user_id = {{ user.id }}
         const white_id = {{ game.white_player.id }}
+        const home_url = {% url 'chess:home' %}
         const mirrored = white_id !== user_id
 
         const white_score = document.getElementById('white-score')
@@ -224,6 +225,7 @@
         let opponent_notifications
         let self_check
         let opponent_check
+        let end_result
 
         if (user_id === white_id) {
             color = 'white'
@@ -268,9 +270,8 @@
 
                 switch (data.type) {
                     case 'end_info':
-                        ws.close()
                         ended = true
-                        console.log(data.result)
+                        end_result = data.result
                         break
                     case 'game_info':
                         if (!ended) {
@@ -365,14 +366,12 @@
                                     'from': selected_cell,
                                     'to': pre_selected_cell,
                                 }))
-                                console.log(`Ход с клетки ${pre_selected_cell} до клетки ${selected_cell}, Фигура: ${last_piece.dataset.color} ${last_piece.dataset.type}`)
                             }
                         } else if (!(cell.children.length === 0) && cell.children[0].dataset.color === color && current_turn == color) {
                             const index = available_positions.findIndex(
                                 elem => elem.length === pre_selected_cell.length && elem.every((value, index) => value === pre_selected_cell[index])
                             )
                             if (index != -1) {
-                                console.log('!', index, available_movements[index])
                                 highlight_positions(available_movements[index])
                             }
                         }
@@ -472,6 +471,36 @@
             } else {
                 notifications.style.display = 'none'
             }
+        }
+
+        const finish_game = () => {
+            Swal.fire({
+                title: end_result === 'win' ? 'Победа' : 'Поражение',
+                html: `
+                <div style="user-select: none">
+                    <p>Заработано очков: ${0}</p>
+                </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Реванш',
+                cancelButtonText: 'На главную',
+                preConfirm: () => {
+                    return false
+                },
+                willOpen: () => {
+                    const confirmButton = Swal.getConfirmButton()
+                    confirmButton.addEventListener('click', () => {
+                        ws.send(JSON.stringify({ 'type': 'want_to_revenge' }))
+                        confirmButton.disabled = true
+                        confirmButton.style.backgroundColor = 'gray'
+                    })
+                }
+            }).then((result) => {
+                if (!result.isConfirmed) {
+                    ws.close()
+                    window.location.href = home_url
+                }
+            })
         }
 
         // подправить movable у королевы
