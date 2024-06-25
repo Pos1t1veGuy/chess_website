@@ -60,7 +60,7 @@ class User(AbstractUser):
     def games(self) -> List['Game']:
         white_games = self.white_player_games.all()
         black_games = self.black_player_games.all()
-        return list(white_games) + list(black_games)
+        return sorted(list(white_games) + list(black_games), key=lambda game: game.created_at)
 
     @property
     def games_count(self) -> int:

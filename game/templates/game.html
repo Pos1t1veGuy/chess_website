@@ -197,6 +197,8 @@
         let last_piece
         let last_piece_color
         let highlightedCells = []
+        let available_movements = []
+        let available_positions = []
         let color
         let opponent_color
         let opponnent_is_connected = false
@@ -265,11 +267,6 @@
                 console.log('message is received ' + data.type)
 
                 switch (data.type) {
-                    case 'available_positions':
-                        if (!ended) {
-                            highlight_positions(data.movements)
-                            break
-                        }
                     case 'end_info':
                         ws.close()
                         ended = true
@@ -295,6 +292,10 @@
                             opponent_check = data.opponent_info.check
                             break
                         }
+                    case 'available_movements':
+                        available_movements = data.movements
+                        available_positions = data.positions
+                        break
                 }
             }
         }
@@ -322,12 +323,6 @@
             for (let y = 0; y < 8; y++) {
                 for (let x = 0; x < 8; x++) {
                     const cell = document.createElement('div')
-                    let pre_selected_cell
-                    if (color === 'white') {
-                        pre_selected_cell = [x, y]
-                    } else {
-                        pre_selected_cell = [x, Math.abs(y - 7)]
-                    }
                     cell.className = 'cell'
                     if (color === 'white') {
                         if ((x + y) % 2 === 0) {
@@ -348,13 +343,20 @@
                         cell.classList.add('highlight')
                         highlightedCell = cell
 
+                        let pre_selected_cell
+                        if (color === 'white') {
+                            pre_selected_cell = [x, y]
+                        } else {
+                            pre_selected_cell = [x, Math.abs(y - 7)]
+                        }
+
                         let empty_or_enemy
                         if (cell.children.length === 0) {
                             empty_or_enemy = true
                         } else {
                             empty_or_enemy = cell.children[0].dataset.color === opponent_color
-                            console.log(cell.children.length === 0, '||', cell.children[0].dataset.color === opponent_color)
                         }
+                        clear_highlighted()
 
                         if (!is_cell_empty && empty_or_enemy && selected_cell !== pre_selected_cell && last_piece) {
                             if (color === last_piece.dataset.color) {
@@ -366,10 +368,13 @@
                                 console.log(`Ход с клетки ${pre_selected_cell} до клетки ${selected_cell}, Фигура: ${last_piece.dataset.color} ${last_piece.dataset.type}`)
                             }
                         } else if (!(cell.children.length === 0) && cell.children[0].dataset.color === color && current_turn == color) {
-                            ws.send(JSON.stringify({
-                                'type': 'get_available_movements',
-                                'position': pre_selected_cell,
-                            }))
+                            const index = available_positions.findIndex(
+                                elem => elem.length === pre_selected_cell.length && elem.every((value, index) => value === pre_selected_cell[index])
+                            )
+                            if (index != -1) {
+                                console.log('!', index, available_movements[index])
+                                highlight_positions(available_movements[index])
+                            }
                         }
 
                         is_cell_empty = cell.children.length === 0
@@ -383,7 +388,6 @@
                         } else {
                             selected_cell = [x, Math.abs(y - 7)]
                         }
-                        clear_highlighted()
                     })
                     board.appendChild(cell)
                 }

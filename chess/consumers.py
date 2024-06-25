@@ -159,7 +159,10 @@ class GameConsumer(AsyncWebsocketConsumer):
                 self.opponent_color = 'black' if self.color == 'white' else 'white'
                 self.opponent = await sync_to_async(game.get_opponent_user)(self.user)
 
+                self.movement_count = game.movement_count
+
                 await self.send_opponent({'type':'opponent_is_connected'})
+                await self.send_available_movements(game)
 
                 self.command_queue_task = asyncio.create_task(self.command_queue())
                 self.client_comm_task = asyncio.create_task(self.client_comm())
@@ -187,39 +190,9 @@ class GameConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data)
         mtype = data['type']
         
-        game = await sync_to_async(lambda: self.user.active_game)()
+        game = (await sync_to_async(lambda: self.user.games)())[-1]
 
         match mtype:
-            case 'get_available_movements':
-                if 'position' in data.keys():
-                    if data['position']:
-                        if len(data['position']) == 2 and all([ str(num).isdigit() for num in data['position'] ]):
-                            pos = [ int(num) for num in data['position'] ]
-                            if all([ 0 <= num <= 7 for num in pos ]):
-                                piece = game[pos]
-                                if piece:
-                                    if piece.color == self.color:
-                                        try:
-                                            res = await sync_to_async(game.piece_movable_to)(pos)
-                                        except Exception as e:
-                                            res = {'type': str(e)}
-
-                                        await self.send(text_data=json.dumps({
-                                            'type': 'available_positions',
-                                            'movements': res,
-                                        }))
-                                    else:
-                                        await self.send(text_data=json.dumps({
-                                            'type': f"You can not move {self.opponent_color} pieces"
-                                        }))
-                                else:
-                                    await self.send(text_data=json.dumps({'type': "Position is invalid"}))
-                            else:
-                                await self.send(text_data=json.dumps({'type': "Position is invalid"}))
-                        else:
-                            await self.send(text_data=json.dumps({'type': "Position is invalid"}))
-                    else:
-                        await self.send(text_data=json.dumps({'type': "Position is invalid"}))
             case 'user_gave_up':
                 await sync_to_async(game.give_up)(self.color)
                 await self.lose()
@@ -298,7 +271,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         global game_consumers_msgs
 
         while 1:
-            game = await sync_to_async(lambda: self.user.active_game)()
+            game = (await sync_to_async(lambda: self.user.games)())[-1]
             if self.user in game_consumers_msgs.keys():
                 for msg in game_consumers_msgs[self.user]:
                     if msg['type'] == 'game_info':
@@ -317,23 +290,28 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     async def client_comm(self):
         while 1:
-            game = await sync_to_async(lambda: self.user.active_game)()
+            game = (await sync_to_async(lambda: self.user.games)())[-1]
             
-            try:
+            if not game.ended:
                 self_check = False
                 opponent_check = False
-                if any([ king.checkmate for king in self.game.kings ]):
-                    king = [ king for king in self.game.kings if king.checkmate ][0]
+                kings = await sync_to_async(lambda: game.kings)()
+                if any([ king.checkmate for king in kings ]):
+                    king = [ king for king in kings if king.checkmate ][0]
                     if king.color == self.color:
-                        self.lose(last_msg=True)
+                        await self.lose(last_msg=True)
                     else:
-                        self.win(last_msg=True)
-                elif any([ king.mate for king in self.game.kings ]):
-                    self.stalemate(last_msg=True)
-                elif any([ king.check for king in self.game.kings ]):
-                    kings = [ king for king in self.game.kings if king.checkmate ]
-                    self_check = self.color in [ king.color for king in kings ]
-                    opponent_check = self.opponent_color in [ king.color for king in kings ]
+                        await self.win(last_msg=True)
+                elif any([ king.mate for king in kings ]):
+                    await self.stalemate(last_msg=True)
+                elif any([ king.check for king in kings ]):
+                    self_check = self.color in [ king.color for king in kings if king.check ]
+                    opponent_check = self.opponent_color in [ king.color for king in kings if king.check ]
+
+                movement_count = await sync_to_async(lambda: game.movement_count)()
+                if self.movement_count < movement_count:
+                    self.movement_count = movement_count
+                    await self.send_available_movements(game)
 
                 await self.send(text_data=json.dumps({
                     'type': "game_info",
@@ -351,12 +329,8 @@ class GameConsumer(AsyncWebsocketConsumer):
                         'check': self_check,
                     }
                 }))
-            except ValueError as ve:
-                if not str(ve) == 'The game is ended':
-                    raise ValueError(ve)
-            except AttributeError as ae:
-                if not str(ae).startswith("'NoneType' object has no attribute"):
-                    raise AttributeError(ae)
+            else:
+                self.end = True
 
             if self.end:
                 break
@@ -370,6 +344,14 @@ class GameConsumer(AsyncWebsocketConsumer):
             game_consumers_msgs[self.opponent] = [ *game_consumers_msgs[self.opponent], data ]
         else:
             game_consumers_msgs[self.opponent] = [data]
+
+    async def send_available_movements(self, game: 'Game'):
+        movements = await sync_to_async(game.all_pieces_movements)(self.color, return_dict=True)
+        await self.send(text_data=json.dumps({
+            'type': "available_movements",
+            'positions': list(movements.keys()),
+            'movements': list(movements.values()),
+        }))
 
     async def is_opponent_alive(self):
         global players_in_game
