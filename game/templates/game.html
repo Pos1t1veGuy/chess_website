@@ -228,6 +228,7 @@
         let opponent_notifications
         let self_check
         let opponent_check
+        let wait_for_response
 
         if (user_id === white_id) {
             color = 'white'
@@ -367,6 +368,15 @@
                             updateNotifications(opponent_notifications, 'Соперник подключился к игре', () => connected && opponnent_is_connected, timeToLive=3000)
                         }
                         break
+                    case 'error':
+                        wait_for_response = false
+                        break
+                    case 'success':
+                        wait_for_response = false
+                        break
+                    case 'redirect':
+                        window.location.href = data.url
+                        break
                 }
             }
         }
@@ -433,20 +443,24 @@
                         }
                         clear_highlighted()
 
-                        if (!is_cell_empty && empty_or_enemy && selected_cell !== pre_selected_cell && last_piece) {
-                            if (color === last_piece.dataset.color) {
-                                ws.send(JSON.stringify({
-                                    'type': 'movement',
-                                    'from': selected_cell,
-                                    'to': pre_selected_cell,
-                                }))
-                            }
-                        } else if (!(cell.children.length === 0) && cell.children[0].dataset.color === color && current_turn == color) {
-                            const index = available_positions.findIndex(
-                                elem => elem.length === pre_selected_cell.length && elem.every((value, index) => value === pre_selected_cell[index])
-                            )
-                            if (index != -1) {
-                                highlight_positions(available_movements[index])
+                        if (!wait_for_response) {
+                            if (!is_cell_empty && empty_or_enemy && selected_cell !== pre_selected_cell && last_piece) {
+                                if (color === last_piece.dataset.color) {
+                                    ws.send(JSON.stringify({
+                                        'type': 'movement',
+                                        'from': selected_cell,
+                                        'to': pre_selected_cell,
+                                    }))
+                                    wait_for_response = true
+                                    highlightedCell.classList.remove('highlight')
+                                }
+                            } else if (!(cell.children.length === 0) && cell.children[0].dataset.color === color && current_turn == color) {
+                                const index = available_positions.findIndex(
+                                    elem => elem.length === pre_selected_cell.length && elem.every((value, index) => value === pre_selected_cell[index])
+                                )
+                                if (index != -1) {
+                                    highlight_positions(available_movements[index])
+                                }
                             }
                         }
 

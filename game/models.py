@@ -25,7 +25,6 @@ def movements_to_str(soft_movements) -> list:
 
 def str_to_movements(movements) -> list:
 	res = []
-	#print(movements)
 
 	for movement in movements:
 		matrix = value_matrix(None, 8, 8)
@@ -69,9 +68,9 @@ def if_not_ended_and_started(func):
 
 def if_time_is_not_up(func):
 	def wrapper(self, *args, **kwargs):
-		timedelta = (timezone.now() - self.last_movement_time).total_seconds()
 
 		if self.playing:
+			timedelta = (timezone.now() - self.last_movement_time).total_seconds()
 			if self.color == 'white' and self.white_player_time + timedelta >= self.max_time:
 				self.end(win='black', res='time')
 			elif self.color == 'black' and self.black_player_time + timedelta >= self.max_time:
@@ -126,32 +125,20 @@ class Game(models.Model):
 
 	@if_time_is_not_up
 	def move(self, _from: list, _to: list, predict_score: bool = False, start_score: int = 100):
-		player_color = self.color
-
-		movements = self.soft_movements
-		last_movement = movements[-1]
+		last_movement = self.soft_movements[-1]
 		first_movement = False
 
 		if isinstance(last_movement[_from[1]][_from[0]], Piece):
 			if self.movement_count == 0 and last_movement[_from[1]][_from[0]].color == self.color == 'white':
 				first_movement = True
-			elif last_movement[_from[1]][_from[0]].color == player_color: # everything has its time
-				pass
-			else:
-				raise ValueError(f"{len(self.movements)} movement is for {player_color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
+			elif last_movement[_from[1]][_from[0]].color != self.color: # everything has its time
+				raise ValueError(f"{len(self.movements)} movement is for {self.color}, but piece at {_from} is a {last_movement[_from[1]][_from[0]].color}")
 		else:
 			raise ValueError("Position from at last game move is empty or not on board, there must be piece to move it")
 
-		all_movements = self.all_pieces_movements(player_color)
-		save_king_movements = []
-		for __from, __to in all_movements:
-			movement = self.make_movement(deepcopy(last_movement), __from, __to)
-			next_king = [piece for piece in (self.black_pieces if player_color == 'black' else self.white_pieces) if isinstance(piece, King)][0]
-			if not next_king.check:
-				save_king_movements.append((list(__from), list(__to)))
-
+		save_king_movements = self.get_save_king_movements(self.color)
 		if len(save_king_movements) == 0:
-			self.end(win='black' if player_color == 'white' else 'white', res='checkmate')
+			self.end(win='black' if self.color == 'white' else 'white', res='checkmate')
 
 		for i, fromto in enumerate([_from, _to]):
 			if isinstance(fromto, list):
@@ -172,12 +159,12 @@ class Game(models.Model):
 		new_movement = self.make_movement(last_movement, _from, _to, reg_destroyed_pieces=True)
 		if (list(_from), list(_to)) in save_king_movements or not (tuple(_from), tuple(_to)) in all_movements:
 			if not predict_score:
-				self.start()
-				self.update_time()
-				self.set_scores(new_movement, player_color, start_score, destroyed_piece, transformed_pawn=False)
+				if first_movement:
+					self.start()
+				self.set_scores(new_movement, self.color, start_score, destroyed_piece, transformed_pawn=False)
 				self.save_movement(new_movement)
 			else:
-				return self.get_movement_score(new_movement, player_color, start_score, destroyed_piece, transformed_pawn=False)
+				return self.get_movement_score(new_movement, self.color, start_score, destroyed_piece, transformed_pawn=False)
 		else:
 			formatted_save_movements = '\n'.join([
 				f'{i+1}. [{movement[0]} -> {movement[1]}]' for i, movement in enumerate(save_king_movements)
@@ -215,7 +202,8 @@ class Game(models.Model):
 
 					last_movement[obj.x][0] = to(obj.color, pos=[obj.x][0])
 					if not predict_score:
-						self.update_time()
+						if len(self.get_save_king_movements(self.color)) == 0:
+							self.end(win='black' if self.color == 'white' else 'white', res='checkmate')
 						self.set_scores(last_movement, self.color, start_score, [], transformed_pawn=True)
 						self.save_movement(last_movement)
 					else:
@@ -225,7 +213,6 @@ class Game(models.Model):
 
 					last_movement[obj.x][7] = to(obj.color, pos=[obj.x][7])
 					if not predict_score:
-						self.update_time()
 						self.set_scores(last_movement, self.color, start_score, [], transformed_pawn=True)
 						self.save_movement(last_movement)
 					else:
@@ -299,7 +286,8 @@ class Game(models.Model):
 								new_movement = self.piece_set_pos([0,0], [3,0], movement=new_movement)
 
 				if not predict_score:
-					self.update_time()
+					if len(self.get_save_king_movements(self.color)) == 0:
+						self.end(win='black' if self.color == 'white' else 'white', res='checkmate')
 					self.set_scores(new_movement, self.color, start_score, [], transformed_pawn=False)
 					self.save_movement(new_movement)
 				else:
@@ -314,14 +302,13 @@ class Game(models.Model):
 	@if_time_is_not_up
 	def make_movement(self, last_movement: list, _from: list, _to: list, reg_destroyed_pieces: bool = False) -> list:
 		# sets position to piece and will destroy enemy piece if it is at TO position and checks kings
-		player_color = self.color
 		kings = [ piece for piece in self.alive_pieces if isinstance(piece, King) ]
 		last_movement[_from[1]][_from[0]].move(_to,
 			enemies=self.black_pieces if last_movement[_from[1]][_from[0]].color == 'white' else self.white_pieces,
 			friends=self.black_pieces if last_movement[_from[1]][_from[0]].color == 'black' else self.white_pieces)
 
 		if last_movement[_to[1]][_to[0]]: # if piece at TO position
-			if last_movement[_to[1]][_to[0]] != player_color: # if it is an enemy piece
+			if last_movement[_to[1]][_to[0]] != self.color: # if it is an enemy piece
 				if reg_destroyed_pieces:
 					self.destroyed_pieces.append(str(last_movement[_to[1]][_to[0]]))
 
@@ -347,19 +334,39 @@ class Game(models.Model):
 		score = self.get_movement_score(*args, **kwargs)
 		if self.color == 'white':
 			self.white_player_score += score
-			self.black_player_score -= score*.5
+			self.black_player_score -= score*.2
 		else:
 			self.black_player_score += score
-			self.white_player_score -= score*.5
+			self.white_player_score -= score*.2
 
 	@if_not_ended
 	@if_time_is_not_up
 	def save_movement(self, new_movement: list):
+		now = timezone.now()
+
+		if self.movement_count > 0:
+			timedelta = (now - self.last_movement_time).total_seconds()
+			if self.color == 'white':
+				self.white_player_time += timedelta
+			else:
+				self.black_player_time += timedelta
+		self.last_movement_time = now
+
 		movements = self.soft_movements
 		movements.append(new_movement)
 		self.movements = movements_to_str(movements)
-		self.last_movement_time = timezone.now()
+
 		self.save()
+
+	def get_save_king_movements(self, color: str) -> list:
+		last_movement = self.soft_movements[-1]
+		save_king_movements = []
+		for __from, __to in self.all_pieces_movements(color):
+			movement = self.make_movement(deepcopy(last_movement), __from, __to)
+			next_king = [piece for piece in (self.black_pieces if color == 'black' else self.white_pieces) if isinstance(piece, King)][0]
+			if not next_king.check:
+				save_king_movements.append((list(__from), list(__to)))
+		return save_king_movements
 
 	@if_not_ended
 	@if_time_is_not_up
@@ -408,33 +415,26 @@ class Game(models.Model):
 
 	@if_not_ended
 	@if_time_is_not_up
-	def update_time(self):
-		timedelta = (timezone.now() - self.last_movement_time).total_seconds()
-		if self.color == 'white':
-			self.white_player_time += timedelta
-		else:
-			self.black_player_time += timedelta
-
-	@if_not_ended
-	@if_time_is_not_up
 	def passed_time(self, color: str) -> int:
 		if self.playing:
-			if color == self.color:
+			if self.color == color:
 				timedelta = (timezone.now() - self.last_movement_time).total_seconds()
+				if color == 'white':
+					return int(self.white_player_time + timedelta)
+				else:
+					return int(self.black_player_time + timedelta)
 			else:
-				timedelta = 0
-
-			if self.color == 'white':
-				res = self.white_player_time + timedelta
+				if color == 'white':
+					return int(self.white_player_time)
+				else:
+					return int(self.black_player_time)
+		elif self.ended:
+			if color == 'white':
+				return int(self.white_player_time)
 			else:
-				res = self.black_player_time + timedelta
+				return int(self.black_player_time)
 		else:
-			if self.color == 'white':
-				res = self.white_player_time
-			else:
-				res = self.black_player_time
-
-		return int(res)
+			return 0
 
 	@if_not_ended
 	@if_time_is_not_up
@@ -450,7 +450,6 @@ class Game(models.Model):
 	@if_not_ended
 	@if_time_is_not_up
 	def stop(self):
-		self.update_time()
 		self.last_movement_time = timezone.now()
 		self.playing = False
 		self.save()
@@ -461,29 +460,8 @@ class Game(models.Model):
 
 		if win == 'white' or win == self.white_player:
 			self.winner = self.white_player
-
-			if self.black_player_score > 0:
-				self.black_player_score *= .5
-			else:
-				self.black_player_score *= 1.5
-
-			if self.white_player_score > 0:
-				self.white_player_score *= 1.5
-			else:
-				self.white_player_score *= .5
 		elif win == 'black' or win == self.black_player:
 			self.winner = self.black_player
-
-			if self.white_player_score > 0:
-				self.white_player_score *= .5
-			else:
-				self.white_player_score *= 1.5
-
-			if self.black_player_score > 0:
-				self.black_player_score *= 1.5
-			else:
-				self.black_player_score *= .5
-
 		else:
 			self.winner = None
 
@@ -491,6 +469,15 @@ class Game(models.Model):
 		self.playing = False
 		self.white_player.global_score += self.white_player_score
 		self.black_player.global_score += self.black_player_score
+
+		if self.movement_count > 0:
+			timedelta = (self.end_time - self.last_movement_time).total_seconds()
+			if self.color == 'white':
+				self.white_player_time += timedelta
+			else:
+				self.black_player_time += timedelta
+		self.last_movement_time = self.end_time
+
 		self.end_reason = res
 		self.save()
 
@@ -559,7 +546,7 @@ class Game(models.Model):
 		w2_1, w2_2, w2_3 = len(frind_side)*.1, len(center)*.45, len(enemy_side)*.8
 		w2 = w2_1 + w2_2 + w2_3
 
-		dp1, dp2 = self.destroyed_pieces_by_color(player), self.destroyed_pieces_by_color('white' if player == 'black' else 'white')
+		dp1, dp2 = self.lost_pieces_by_color(player), self.lost_pieces_by_color('white' if player == 'black' else 'white')
 
 		w3 = 0
 		if sum([ piece.price for piece in dp1 ]) > 0:
@@ -664,10 +651,8 @@ class Game(models.Model):
 
 		return res_dict if return_dict else list_res
 
-	def destroyed_pieces_by_color(self, color: str) -> list:
-		return [ eval(f"{piece.split(' ')[0]}('{piece.split(' ')[1]}')") for piece in self.destroyed_pieces if piece.split(' ')[1] == color ]
 	def lost_pieces_by_color(self, color: str) -> list:
-		return [ eval(f"{piece.split(' ')[0]}('{piece.split(' ')[1]}')") for piece in self.lost_pieces if piece.split(' ')[1] == color ]
+		return [ eval(f"{piece.split(' ')[0]}('{piece.split(' ')[1]}')") for piece in self.destroyed_pieces if piece.split(' ')[1] == color ]
 
 	def get_king_by_color(self):
 		return [ king for king in self.kings if king.color == color]
@@ -753,6 +738,3 @@ class Game(models.Model):
 		return f"Game({len(self)} movements, {'the game continues' if self.playing else 'the game is paused or finished'}, next movement: {self.color})"
 	def __list__(self):
 		return list(self.movements)
-
-# Протестить мувменты
-# Протестить выдачу очков по ходу игры и в конце

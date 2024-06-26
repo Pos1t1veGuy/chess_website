@@ -2,6 +2,7 @@ import json, random, asyncio
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.core.cache import cache
 from asgiref.sync import sync_to_async
+from django.urls import reverse
 
 from AUTH.models import User
 from game.models import Game
@@ -153,13 +154,22 @@ class GameConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
         if self.user.is_authenticated:
-            game = await sync_to_async(lambda: self.user.active_game)()
-            if game:
+            try:
+                game = (await sync_to_async(lambda: self.user.games)())[-1]
+            except IndexError:
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'info': 'user has not a game'
+                }))
+                await self.disconnect(0)
+
+            if not game.ended:
                 self.end = False
 
+                self.game_id = game.id
+                self.opponent = await sync_to_async(game.get_opponent_user)(self.user)
                 self.color = await sync_to_async(game.get_color_by_user)(self.user)
                 self.opponent_color = 'black' if self.color == 'white' else 'white'
-                self.opponent = await sync_to_async(game.get_opponent_user)(self.user)
 
                 self.movement_count = game.movement_count
 
@@ -194,84 +204,111 @@ class GameConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data)
         mtype = data['type']
         
-        game = (await sync_to_async(lambda: self.user.games)())[-1]
+        game = await sync_to_async(Game.objects.get)(id=self.game_id)
 
         match mtype:
             case 'user_gave_up':
-                if not game.playing:
-                    await sync_to_async(game.start)()
-                await sync_to_async(game.give_up)(self.color)
-                await self.lose()
+                if not game.ended:
+                    if not game.playing:
+                        await sync_to_async(game.start)()
+                    await self.lose()
+                    await sync_to_async(game.give_up)(self.color)
+                else:
+                    await self.send(text_data=json.dumps({
+                        'type': "redirect",
+                        'url': reverse('chess:home')
+                    }))
             case 'movement':
-                if 'from' in data.keys() and 'to' in data.keys():
-                    if data['from']:
-                        if data['to']:
-                            if len(data['from']) == 2 and all([ str(num).isdigit() for num in data['from'] ]):
-                                piece = game[data['from']]
-                                if piece:
-                                    if piece.color == self.color:
-                                        try:
-                                            res = await sync_to_async(game.move)([ int(num) for num in data['from'] ], data['to'])
-                                        except Exception as e:
-                                            await self.send(text_data=json.dumps({'type': str(e)}))
-                                    else:
-                                        await self.send(text_data=json.dumps({
-                                            'type': f"You can not move {self.opponent_color} pieces"
-                                        }))
-                                else:
-                                    await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
-                            else:
-                                await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
-                        else:
-                            await self.send(text_data=json.dumps({'type': "Position to is invalid"}))
-                    else:
-                        await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
-
-            case 'transform_pawn':
-                if 'position' in data.keys() and 'to' in data.keys():
-                    if data['position']:
-                        if data['to']:
-                            if len(data['position']) == 2 and all([ str(num).isdigit() for num in data['position'] ]):
-                                piece = game[data['position']]
-                                if piece:
-                                    if piece.color == self.color:
-                                        if data['to'] in string_pieces.lower():
+                if not game.ended:
+                    if 'from' in data.keys() and 'to' in data.keys():
+                        if data['from']:
+                            if data['to']:
+                                if len(data['from']) == 2 and all([ str(num).isdigit() for num in data['from'] ]):
+                                    piece = game[data['from']]
+                                    if piece:
+                                        if piece.color == self.color:
                                             try:
-                                                res = await sync_to_async(game.transform_pawn)(
-                                                    [ int(num) for num in data['position'] ],
-                                                    data['to'],
-                                                    return_json=True
-                                                )
+                                                res = await sync_to_async(game.move)([ int(num) for num in data['from'] ], data['to'])
+                                                await self.send(text_data=json.dumps({'type': 'success'}))
                                             except Exception as e:
                                                 await self.send(text_data=json.dumps({'type': str(e)}))
                                         else:
                                             await self.send(text_data=json.dumps({
-                                                'type': "Typed invalid piece name in which the pawn will be transformed"
+                                                'type': f"You can not move {self.opponent_color} pieces"
                                             }))
                                     else:
-                                        await self.send(text_data=json.dumps({
-                                            'type': f"You can not move {self.opponent_color} pieces"
-                                        }))
+                                        await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
+                                else:
+                                    await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
+                            else:
+                                await self.send(text_data=json.dumps({'type': "Position to is invalid"}))
+                        else:
+                            await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
+                else:
+                    await self.send(text_data=json.dumps({
+                        'type': "redirect",
+                        'url': reverse('chess:home')
+                    }))
+
+            case 'transform_pawn':
+                if not game.ended:
+                    if 'position' in data.keys() and 'to' in data.keys():
+                        if data['position']:
+                            if data['to']:
+                                if len(data['position']) == 2 and all([ str(num).isdigit() for num in data['position'] ]):
+                                    piece = game[data['position']]
+                                    if piece:
+                                        if piece.color == self.color:
+                                            if data['to'] in string_pieces.lower():
+                                                try:
+                                                    res = await sync_to_async(game.transform_pawn)(
+                                                        [ int(num) for num in data['position'] ],
+                                                        data['to'],
+                                                        return_json=True
+                                                    )
+                                                    await self.send(text_data=json.dumps({'type': 'success'}))
+                                                except Exception as e:
+                                                    await self.send(text_data=json.dumps({'type': str(e)}))
+                                            else:
+                                                await self.send(text_data=json.dumps({
+                                                    'type': "Typed invalid piece name in which the pawn will be transformed"
+                                                }))
+                                        else:
+                                            await self.send(text_data=json.dumps({
+                                                'type': f"You can not move {self.opponent_color} pieces"
+                                            }))
+                                    else:
+                                        await self.send(text_data=json.dumps({'type': "Position is invalid"}))
                                 else:
                                     await self.send(text_data=json.dumps({'type': "Position is invalid"}))
                             else:
-                                await self.send(text_data=json.dumps({'type': "Position is invalid"}))
+                                await self.send(text_data=json.dumps({'type': "Position to is invalid"}))
                         else:
-                            await self.send(text_data=json.dumps({'type': "Position to is invalid"}))
-                    else:
-                        await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
+                            await self.send(text_data=json.dumps({'type': "Position from is invalid"}))
+                else:
+                    await self.send(text_data=json.dumps({
+                        'type': "redirect",
+                        'url': reverse('chess:home')
+                    }))
 
             case 'castling':
-                if 'direction' in data.keys():
-                    if data['direction'] in ['left', 'right']:
-                        try:
-                            res = await sync_to_async(game.castling)(data['direction'], self.color)
-                        except Exception as e:
-                            await self.send(text_data=json.dumps({'type': str(e)}))
-                    else:
-                        await self.send(text_data=json.dumps({
-                            'type': "you typed invalid direction"
-                        }))
+                if not game.ended:
+                    if 'direction' in data.keys():
+                        if data['direction'] in ['left', 'right']:
+                            try:
+                                res = await sync_to_async(game.castling)(data['direction'], self.color)
+                                await self.send(text_data=json.dumps({'type': 'success'}))
+                            except Exception as e:
+                                await self.send(text_data=json.dumps({'type': str(e)}))
+                        else:
+                            await self.send(text_data=json.dumps({
+                                'type': "you typed invalid direction"
+                            }))
+                else:
+                    await self.send(text_data=json.dumps({
+                        'type': "redirect",
+                        'url': reverse('chess:home')
+                    }))
 
             case 'want_to_revenge':
                 await self.send_opponent({'type': 'opponent_want_to_revenge'})
@@ -284,20 +321,20 @@ class GameConsumer(AsyncWebsocketConsumer):
         global game_consumers_msgs
 
         while 1:
-            game = (await sync_to_async(lambda: self.user.games)())[-1]
+            game = await sync_to_async(Game.objects.get)(id=self.game_id)
             if self.user in game_consumers_msgs.keys():
                 for msg in game_consumers_msgs[self.user]:
                     await self.send(text_data=json.dumps(msg))
                     game_consumers_msgs[self.user].remove(msg)
             
-            await asyncio.sleep(.5)
+            await asyncio.sleep(.8)
 
             if self.end:
                 break
 
     async def client_comm(self):
         while 1:
-            game = (await sync_to_async(lambda: self.user.games)())[-1]
+            game = await sync_to_async(Game.objects.get)(id=self.game_id)
             
             if not game.ended:
                 self_check = False
@@ -342,15 +379,18 @@ class GameConsumer(AsyncWebsocketConsumer):
             if self.end:
                 break
 
-            await asyncio.sleep(.8)
+            await asyncio.sleep(.25)
 
     async def send_opponent(self, data: dict):
         global game_consumers_msgs
 
-        if self.opponent in game_consumers_msgs.keys():
-            game_consumers_msgs[self.opponent] = [ *game_consumers_msgs[self.opponent], data ]
-        else:
-            game_consumers_msgs[self.opponent] = [data]
+        try:
+            if self.opponent in game_consumers_msgs.keys():
+                game_consumers_msgs[self.opponent] = [ *game_consumers_msgs[self.opponent], data ]
+            else:
+                game_consumers_msgs[self.opponent] = [data]
+        except AttributeError:
+            self.disconnect(0)
 
     async def send_available_movements(self, game: 'Game'):
         movements = await sync_to_async(game.all_pieces_movements)(self.color, return_dict=True)
@@ -365,17 +405,18 @@ class GameConsumer(AsyncWebsocketConsumer):
         return self.opponent in players_in_game
 
     async def lose(self, last_msg: bool = False):
-        game = (await sync_to_async(lambda: self.user.games)())[-1]
+        game = await sync_to_async(Game.objects.get)(id=self.game_id)
         lost_pieces = [
-            await sync_to_async(lambda: game.lost_pieces_by_color)(self.color),
-            await sync_to_async(lambda: game.lost_pieces_by_color)(self.opponent_color),
+            await sync_to_async(lambda color: game.lost_pieces_by_color(color))(self.color),
+            await sync_to_async(lambda color: game.lost_pieces_by_color(color))(self.opponent_color),
         ]
         await self.send(text_data=json.dumps({
             'type': 'end_info',
             'score': await self.get_score(),
+            'time': await sync_to_async(game.passed_time)(self.color),
             'movement_count': await sync_to_async(lambda: game.movement_count)(),
-            'lost_pieces': [ str(piece) for piece in lost_pieces[0] ],
-            'opponent_lost_pieces': [ str(piece) for piece in lost_pieces[1] ],
+            'lost_pieces': len(lost_pieces[0]),
+            'opponent_lost_pieces': len(lost_pieces[1]),
             'lost_price': sum([ piece.price for piece in lost_pieces[0] ]),
             'opponent_lost_piece': sum([ piece.price for piece in lost_pieces[1] ]),
             'result': 'lose',
@@ -384,26 +425,28 @@ class GameConsumer(AsyncWebsocketConsumer):
             await self.send_opponent({
                 'type': 'end_info',
                 'score': await self.get_score(),
+                'time': await sync_to_async(game.passed_time)(self.opponent_color),
                 'movement_count': await sync_to_async(lambda: game.movement_count)(),
-                'lost_pieces': [ str(piece) for piece in lost_pieces[1] ],
-                'opponent_lost_pieces': [ str(piece) for piece in lost_pieces[0] ],
+                'lost_pieces': len(lost_pieces[1]),
+                'opponent_lost_pieces': len(lost_pieces[0]),
                 'lost_price': sum([ piece.price for piece in lost_pieces[1] ]),
                 'opponent_lost_piece': sum([ piece.price for piece in lost_pieces[0] ]),
                 'result': 'win',
             })
         await self.disconnect(0)
     async def win(self, last_msg: bool = False):
-        game = (await sync_to_async(lambda: self.user.games)())[-1]
+        game = await sync_to_async(Game.objects.get)(id=self.game_id)
         lost_pieces = [
-            await sync_to_async(lambda: game.lost_pieces_by_color)(self.color),
-            await sync_to_async(lambda: game.lost_pieces_by_color)(self.opponent_color),
+            await sync_to_async(lambda color: game.lost_pieces_by_color(color))(self.color),
+            await sync_to_async(lambda color: game.lost_pieces_by_color(color))(self.opponent_color),
         ]
         await self.send(text_data=json.dumps({
             'type': 'end_info',
             'score': await self.get_score(),
+            'time': await sync_to_async(game.passed_time)(self.color),
             'movement_count': await sync_to_async(lambda: game.movement_count)(),
-            'lost_pieces': [ str(piece) for piece in lost_pieces[0] ],
-            'opponent_lost_pieces': [ str(piece) for piece in lost_pieces[1] ],
+            'lost_pieces': len(lost_pieces[0]),
+            'opponent_lost_pieces': len(lost_pieces[1]),
             'lost_price': sum([ piece.price for piece in lost_pieces[0] ]),
             'opponent_lost_piece': sum([ piece.price for piece in lost_pieces[1] ]),
             'result': 'win',
@@ -412,26 +455,28 @@ class GameConsumer(AsyncWebsocketConsumer):
             await self.send_opponent({
                 'type': 'end_info',
                 'score': await self.get_score(),
+                'time': await sync_to_async(game.passed_time)(self.opponent_color),
                 'movement_count': await sync_to_async(lambda: game.movement_count)(),
-                'lost_pieces': [ str(piece) for piece in lost_pieces[1] ],
-                'opponent_lost_pieces': [ str(piece) for piece in lost_pieces[0] ],
+                'lost_pieces': len(lost_pieces[1]),
+                'opponent_lost_pieces': len(lost_pieces[0]),
                 'lost_price': sum([ piece.price for piece in lost_pieces[1] ]),
                 'opponent_lost_piece': sum([ piece.price for piece in lost_pieces[0] ]),
                 'result': 'lose',
             })
         await self.disconnect(0)
     async def stalemate(self, last_msg: bool = False):
-        game = (await sync_to_async(lambda: self.user.games)())[-1]
+        game = await sync_to_async(Game.objects.get)(id=self.game_id)
         lost_pieces = [
-            await sync_to_async(lambda: game.lost_pieces_by_color)(self.color),
-            await sync_to_async(lambda: game.lost_pieces_by_color)(self.opponent_color),
+            await sync_to_async(lambda color: game.lost_pieces_by_color(color))(self.color),
+            await sync_to_async(lambda color: game.lost_pieces_by_color(color))(self.opponent_color),
         ]
         await self.send(text_data=json.dumps({
             'type': 'end_info',
             'score': await self.get_score(),
+            'time': await sync_to_async(game.passed_time)(self.color),
             'movement_count': await sync_to_async(lambda: game.movement_count)(),
-            'lost_pieces': [ str(piece) for piece in lost_pieces[0] ],
-            'opponent_lost_pieces': [ str(piece) for piece in lost_pieces[1] ],
+            'lost_pieces': len(lost_pieces[0]),
+            'opponent_lost_pieces': len(lost_pieces[1]),
             'lost_price': sum([ piece.price for piece in lost_pieces[0] ]),
             'opponent_lost_piece': sum([ piece.price for piece in lost_pieces[1] ]),
             'result': 'stalemate',
@@ -440,9 +485,10 @@ class GameConsumer(AsyncWebsocketConsumer):
             await self.send_opponent({
                 'type': 'end_info',
                 'score': await self.get_score(),
+                'time': await sync_to_async(game.passed_time)(self.opponent_color),
                 'movement_count': await sync_to_async(lambda: game.movement_count)(),
-                'lost_pieces': [ str(piece) for piece in lost_pieces[1] ],
-                'opponent_lost_pieces': [ str(piece) for piece in lost_pieces[0] ],
+                'lost_pieces': len(lost_pieces[1]),
+                'opponent_lost_pieces': len(lost_pieces[0]),
                 'lost_price': sum([ piece.price for piece in lost_pieces[1] ]),
                 'opponent_lost_piece': sum([ piece.price for piece in lost_pieces[0] ]),
                 'result': 'stalemate',
@@ -454,7 +500,7 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     @property
     def score(self) -> int:
-        game = self.user.active_game
+        game = Game.objects.get(id=self.game_id)
         if self.user == game.white_player:
             return game.white_player_score
         elif self.user == game.black_player:
