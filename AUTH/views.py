@@ -8,6 +8,8 @@ from django.contrib.auth import authenticate, login, logout
 from django.core.cache import cache
 from django.views.decorators.csrf import csrf_protect
 from django.utils.decorators import method_decorator
+from io import BytesIO
+from django.core.files.uploadedfile import InMemoryUploadedFile
 
 from .models import User
 from .forms import *
@@ -16,6 +18,7 @@ from importlib import import_module
 from django.conf import settings
 import secrets
 import random
+import os
 
 
 def redirect_back(request, excluding_url: str = None):
@@ -104,24 +107,21 @@ class edit(View):
             request.POST.get('email', None) == request.user.email and
             request.POST.get('avatar', None) == request.user.avatar
             ):
-            print(2)
             return redirect_back(request, reverse('auth:edit_profile'))
 
         elif ep_form.is_valid():
-            print(3)
             if request.POST.get('password', None) != '' or request.POST.get('email', None) != request.user.email:
-                print(4)
-                request.session['ep_form'] = ep_form.cleaned_data
+                request.session['ep_form'] = ep_form.serialize()
                 ep_form.send_code(request.user.email)
                 return redirect('auth:code')
 
             else:
-                print(5)
                 ep_form.save()
                 return redirect_back(request, reverse('auth:edit_profile'))
 
         else:
-            print(6)
+            if request.POST.get('avatar', None) == request.user.avatar:
+                ep_form.fields['avatar'].initial = ''
             return render(request, 'edit_profile.html', {'user': request.user, 'form': ep_form})
 
 
@@ -142,8 +142,20 @@ class code(View):
         cache_data = cache.get(f'temp_code_{code}', None)
         if cache_data:
             if cache_data['type'] == 'form':
-                module = import_module(cache_data['class_path'])
-                FormObject = getattr(module, cache_data['class_name'])(data=cache_data['form_data'])
+                form_module = import_module(cache_data['class_path'])
+                data = cache_data['form_data']
+                for key, value in data.items():
+                    if isinstance(data[key], dict):
+                        if list(data[key].keys())[0] == 'image':
+                            file = data[key]['image']
+                            bytes_ = open(settings.TEMP_MEDIA_DIR + file, 'rb').read()
+                            io = BytesIO(bytes_)
+                            io.seek(0)
+
+                            data[key] = InMemoryUploadedFile(io, None, file, 'image/png', len(bytes_), None)
+                            os.remove(settings.TEMP_MEDIA_DIR + file)
+
+                FormObject = getattr(form_module, cache_data['class_name'])(data=data, instance=request.user) # Уникальность
 
                 if FormObject.is_valid():
                     res = FormObject.save()
@@ -153,6 +165,8 @@ class code(View):
                             login(request, res)
 
                     return redirect_back(request)
+                else:
+                    print(FormObject.errors)
 
         raise Http404('')
 

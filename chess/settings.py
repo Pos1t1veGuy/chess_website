@@ -138,6 +138,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 ICONS_DIR = f'{BASE_DIR}/media/icons/'.replace('\\', '/')
 ICONS_SIZE = (200, 200)
+TEMP_MEDIA_DIR = f'{BASE_DIR}/media/temp_avatars/'
 
 AUTH_USER_MODEL = 'AUTH.User'
 ENABLED_USERNAME_CHARS = string.ascii_letters + string.digits + '_-'

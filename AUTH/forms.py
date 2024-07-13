@@ -4,13 +4,17 @@ from django.contrib.auth import authenticate
 from django.core.exceptions import ValidationError
 from django.utils.crypto import get_random_string
 from django.core.mail import send_mail
-
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from django.core.cache import cache
+
 from email_validate import validate
 from PIL import Image
 from django.conf import settings
 
 from AUTH.models import User
+import secrets
+import os
 
 
 class LoginForm(forms.Form):
@@ -72,15 +76,22 @@ class RegisterForm(forms.ModelForm):
             raise ValidationError('Пароль должен содержать только символы [a-z] [A-Z] [0-9]')
         return password
 
-    def send_code(self, email: str):
-        code = get_random_string(length=4, allowed_chars='0123456789')
-        cache.set(f'temp_code_{code}', {
+    def serialize(self) -> dict:
+        return {
             'type': 'form',
             'class_name': self.__class__.__name__,
             'class_path': 'AUTH.forms',
-            'form_data': model_to_dict(self.instance, fields=['username', 'email', 'password']),
+            'form_data': {
+                'username': self.cleaned_data['username'],
+                'email': self.cleaned_data['email'],
+                'password': self.cleaned_data['password'],
+            },
             'login_after': True,
-        }, timeout=settings.REG_CODE_TIMEOUT)
+        }
+
+    def send_code(self, email: str):
+        code = get_random_string(length=4, allowed_chars='0123456789')
+        cache.set(f'temp_code_{code}', self.serialize(), timeout=settings.REG_CODE_TIMEOUT)
 
         send_mail('Код подтверждения изменений профиля', f'Ваш код подтверждения: {code}', settings.EMAIL_HOST_USER, [email])
 
@@ -97,7 +108,7 @@ class EditProfileForm(forms.ModelForm):
     first_name = forms.CharField(label='Имя', max_length=254, required=False)
     last_name = forms.CharField(label='Фамилия', max_length=254, required=False)
 
-    avatar = forms.ImageField(label='Аватар', max_length=254)
+    avatar = forms.ImageField(label='Аватар', max_length=254, required=False)
     email = forms.CharField(label='Почта', max_length=254)
     password = forms.CharField(label='Пароль', widget=forms.PasswordInput(attrs={'id': 'register_password', 'autocomplete': 'new-password'}), required=False)
 
@@ -123,10 +134,11 @@ class EditProfileForm(forms.ModelForm):
 
     def clean_password(self):
         password = self.cleaned_data.get('password')
-        if len(password) < settings.PASSWORD_MIN_LENGTH:
-            raise ValidationError(f'Пароль должен быть минимум из {settings.PASSWORD_MIN_LENGTH} символов')
-        if not all([ char in settings.ENABLED_PASSWORD_CHARS for char in password ]):
-            raise ValidationError('Пароль должен содержать только символы [a-z] [A-Z] [0-9]')
+        if password:
+            if len(password) < settings.PASSWORD_MIN_LENGTH:
+                raise ValidationError(f'Пароль должен быть минимум из {settings.PASSWORD_MIN_LENGTH} символов')
+            if not all([ char in settings.ENABLED_PASSWORD_CHARS for char in password ]):
+                raise ValidationError('Пароль должен содержать только символы [a-z] [A-Z] [0-9]')
         return password
 
     def clean_avatar(self):
@@ -149,15 +161,34 @@ class EditProfileForm(forms.ModelForm):
 
         return avatar
 
-    def send_code(self, email: str):
-        code = get_random_string(length=4, allowed_chars='0123456789')
-        cache.set(f'temp_code_{code}', {
+    def serialize(self) -> dict:
+        if self.cleaned_data['avatar']:
+            filename = f'i{secrets.token_hex(20)}.png'
+            while os.path.isfile(settings.TEMP_MEDIA_DIR + filename):
+                filename = f'i{secrets.token_hex(20)}.png'
+
+            default_storage.save( settings.TEMP_MEDIA_DIR + filename, ContentFile(self.cleaned_data['avatar'].read()) )
+            avatar_path = filename
+        else:
+            avatar_path = None
+        return {
             'type': 'form',
             'class_name': self.__class__.__name__,
             'class_path': 'AUTH.forms',
-            'form_data': model_to_dict(self.instance),
-        }, timeout=settings.EP_CODE_TIMEOUT)
+            'form_data': {
+                'username': self.cleaned_data['username'],
+                'first_name': self.cleaned_data['first_name'],
+                'last_name': self.cleaned_data['last_name'],
 
+                'avatar': {'image': avatar_path},
+                'email': self.cleaned_data['email'],
+                'password': self.cleaned_data['password'],
+            },
+        }
+
+    def send_code(self, email: str):
+        code = get_random_string(length=4, allowed_chars='0123456789')
+        cache.set(f'temp_code_{code}', self.serialize(), timeout=settings.EP_CODE_TIMEOUT)
         send_mail('Код подтверждения изменений профиля', f'Ваш код подтверждения: {code}', settings.EMAIL_HOST_USER, [email])
 
     def save(self, commit=True):
