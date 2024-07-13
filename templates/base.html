@@ -28,6 +28,7 @@
             padding: 20px;
         }
     </style>
+    {% block header %}{% endblock %}
 </head>
 <body class="dark-theme">
     <header>
@@ -35,6 +36,9 @@
             <ul>
                 <li><a href="{% url 'chess:home' %}">Главная</a></li>
                 <li><a href="{% url 'chess:leaders' %}">Список лидеров</a></li>
+                {% if user.is_superuser %}
+                    <li><a href="{% url 'admin:index' %}">Админка</a></li>
+                {% endif %}
                 {% if user.is_authenticated %}
                     <li>
                         <a href="{% url 'auth:info' %}" class="profile-button">
@@ -138,8 +142,10 @@
                 }
             }
 
-            minTimeInput.addEventListener('change', validateTimeRange)
-            maxTimeInput.addEventListener('change', validateTimeRange)
+            {% if user.is_in_game and user.is_authenticated %}
+                minTimeInput.addEventListener('change', validateTimeRange)
+                maxTimeInput.addEventListener('change', validateTimeRange)
+            {% endif %}
 
             const getSafeValue = (value, def = '') => {
                 return value != undefined ? value : def;

@@ -16,6 +16,7 @@
     {% else %}
         <p>смертный</p>
     {% endif %}
+    <a href="{% url 'auth:edit_profile' %}">Редактировать профиль</a>
     <p>Последнее обновление {{ account.last_updated }}</p>
 {% else %}
     <p>Такого пользователя не существует</p>

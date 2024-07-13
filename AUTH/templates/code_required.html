@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block title %}Редактировать профиль{% endblock %}
+
+{% block content %}
+
+<p>Вам на почту должно прийти письмо с кодом</p>
+<form method="post" action="{% url 'auth:code' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    <label for="code">Введите код:</label>
+    <input type="text" id="code" name="code">
+</form>
+
+<script>
+    const previewAvatar = (event) => {
+        const avatarPreview = document.getElementById('avatarPreview');
+        avatarPreview.src = URL.createObjectURL(event.target.files[0]);
+        avatarPreview.onload = () => URL.revokeObjectURL(avatarPreview.src);
+    }
+</script>
+
+{% endblock %}

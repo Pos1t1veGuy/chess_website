@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Редактировать профиль{% endblock %}
+
+{% block content %}
+
+<form method="post" enctype="multipart/form-data" action="{% url 'auth:edit_profile' %}">
+    {% csrf_token %}
+    
+    {{ form.username.label_tag }}
+    @{{ form.username }}
+    <br>
+    
+    {{ form.first_name.label_tag }}
+    {{ form.first_name }}
+    <br>
+    
+    {{ form.last_name.label_tag }}
+    {{ form.last_name }}
+    <br>
+    
+    {{ form.avatar.label_tag }}
+    {{ form.avatar }}
+    <br>
+    
+    {{ form.email.label_tag }}
+    {{ form.email }}
+    <br>
+    
+    {{ form.password.label_tag }}
+    {{ form.password }}
+    <br>
+
+    <p>Чтобы поменять пароль или почту, нужно подтвердить действие письмом на почту</p>
+    <button type="submit">Подтвердить изменения</button>
+</form>
+{% if form.errors %}
+    <div class="form-errors" style="color: red;">
+        <ul>
+            {% for field, errors in form.errors.items %}
+                <li>{{ field }}:
+                    <ul>
+                        {% for error in errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+
+<script>
+    const openFileInput = () => {
+        document.getElementById('id_avatar').click()
+    }
+
+    const updateAvatarPreview = (input) => {
+        if (input.files && input.files[0]) {
+            let reader = new FileReader()
+
+            reader.onload = (e) => {
+                document.getElementById('current_avatar').src = e.target.result
+            }
+
+            reader.readAsDataURL(input.files[0])
+        }
+    }
+</script>
+
+
+{% endblock %}

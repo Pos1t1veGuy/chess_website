@@ -4,35 +4,101 @@
 
 {% block content %}
 
-<h2>Авторизация</h2>
-<form method="post" action="{% url 'auth:auth' %}">
-    {% csrf_token %}
-    <input type="hidden" name="type" value="auth">
-    <label for="login">Почта/Ник:</label>
-    <input type="text" name="email_or_username" required>
-    <br>
-    <label for="password">Пароль:</label>
-    <input type="password" name="password" required>
-    <br>
-    <button type="submit">Войти</button>
-</form>
-{{ auth_error }}
+<div id="login_form">
+    <form method="post" action="{% url 'auth:auth' %}">
+        <h2>Авторизация</h2>
+        {% csrf_token %}
+        <input type="hidden" name="type" value="auth">
+        {{ login_form.email_or_username.label_tag }}
+        {{ login_form.email_or_username }}<br>
+        {{ login_form.password.label_tag }}
+        {{ login_form.password }}
+        <button type="button" id='log_show_button' onclick="togglePasswordVisibility('login_password', 'log_show_button')">Показать пароль</button><br>
+        <br><button type="submit">Войти</button>
+    </form>
+    {% if auth_error %}
+        <p style="color: red;">{{ auth_error }}</p>
+    {% endif %}
+    {% if login_form.errors %}
+        <div class="form-errors" style="color: red;">
+            <ul>
+                {% for field, errors in login_form.errors.items %}
+                    <li>{{ field }}:
+                        <ul>
+                            {% for error in errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+    <p>Ты еще не зарегестрировался? <button href="#" onclick="showRegisterForm()">Регистрация</button></p>
+</div>
 
-<h2>Регистрация</h2>
-<form method="post" action="{% url 'auth:auth' %}">
-    {% csrf_token %}
-    <input type="hidden" name="type" value="reg">
-    <label for="username">Ник:</label>
-    <input type="text" name="username" required>
-    <br>
-    <label for="email">Почта:</label>
-    <input type="email" name="email" required>
-    <br>
-    <label for="password">Пароль:</label>
-    <input type="password" name="password" required>
-    <br>
-    <button type="submit">Зарегистрироваться</button>
-</form>
-{{ reg_error }}
+<div id="register_form">
+    <form method="post" action="{% url 'auth:auth' %}">
+        <h2>Регистрация</h2>
+        {% csrf_token %}
+        <input type="hidden" name="type" value="reg">
+        {{ register_form.username.label_tag }}
+        {{ register_form.username }}<br>
+        {{ register_form.email.label_tag }}
+        {{ register_form.email }}<br>
+        {{ register_form.password.label_tag }}
+        {{ register_form.password }}
+        <button type="button" id='reg_show_button' onclick="togglePasswordVisibility('register_password', 'reg_show_button')">Показать пароль</button><br>
+        <br><button type="submit">Зарегистрироваться</button>
+    </form>
+    {% if reg_error %}
+        <p style="color: red;">{{ reg_error }}</p>
+    {% endif %}
+    {% if register_form.errors %}
+        <div class="form-errors" style="color: red;">
+            <ul>
+                {% for field, errors in register_form.errors.items %}
+                    <li>{{ field }}:
+                        <ul>
+                            {% for error in errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+    <p>Ты уже местный? <button href="#" onclick="showLoginForm()">Войти</button></p>
+</div>
+    
+<script>
+    const showLoginForm = () => {
+        document.getElementById('login_form').style.display = 'block'
+        document.getElementById('register_form').style.display = 'none'
+    }
+    const showRegisterForm = () => {
+        document.getElementById('login_form').style.display = 'none'
+        document.getElementById('register_form').style.display = 'block'
+    }
+
+    const togglePasswordVisibility = (passwordFieldId, buttonId) => {
+        let passwordField = document.getElementById(passwordFieldId)
+        let button = document.getElementById(buttonId)
+        if (passwordField.type === "password") {
+            passwordField.type = "text"
+            button.textContent = 'Скрыть пароль'
+        } else {
+            passwordField.type = "password"
+            button.textContent = 'Показать пароль'
+        }
+    }
+    {% if reg %}
+        showRegisterForm()
+    {% else %}
+        showLoginForm()
+    {% endif %}
+</script>
+
 
 {% endblock %}

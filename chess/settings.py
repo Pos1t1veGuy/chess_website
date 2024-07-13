@@ -141,6 +141,9 @@ ICONS_SIZE = (200, 200)
 
 AUTH_USER_MODEL = 'AUTH.User'
 ENABLED_USERNAME_CHARS = string.ascii_letters + string.digits + '_-'
+ENABLED_PASSWORD_CHARS = string.ascii_letters + string.digits
+PASSWORD_MIN_LENGTH = 8
+MAX_AVATAR_SIZE = 4 # MB
 MAX_USERNAME_LENGTH = 45
 MIN_USERNAME_LENGTH = 1
 
@@ -159,3 +162,6 @@ FILE_CACHE = ProjectCache(f'{BASE_DIR}/cache.json', default_content={
         "icons_size": list(PIECES_IMAGES_SIZE),
     }
 })
+EP_CODE_TIMEOUT = 5 * 60
+REG_CODE_TIMEOUT = 5 * 60
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

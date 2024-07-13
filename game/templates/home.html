@@ -2,6 +2,100 @@
 
 {% block title %}Главная{% endblock %}
 
+{% block header %}
+    <style>
+        .container {
+            display: flex;
+            justify-content: space-between;
+        }
+        .column {
+            width: 48%;
+        }
+        h3 {
+            margin-top: 0;
+        }
+    </style>
+{% endblock %}
+
 {% block content %}
-    home
+    <div class="container">
+        <div class="column">
+            <h3>Список игр</h3>
+            <ul id="games-list"></ul>
+        </div>
+        <div class="column">
+            <h3>Список пользователей</h3>
+            <ul id="users-list"></ul>
+        </div>
+    </div>
+
+    <script>
+        let activeGamesIndex = 0
+        let usersQueueIndex = 0
+        const portion = 2
+
+        const loadMoreData = () => {
+            fetch(`/api/?key=active_games&index=${activeGamesIndex}&portion=${portion}`)
+                .then(response => response.json())
+                .then(data => {
+                    const gamesList = document.getElementById('games-list')
+                    data.forEach(game => {
+                        const gameElement = document.createElement('li')
+                        gameElement.innerHTML = `<a href="{% url 'chess:home_redirect' %}/${game[0]}/info">Game ${game[2]} vs ${game[3]}</a>`
+                        gamesList.appendChild(gameElement)
+                    })
+                    activeGamesIndex += portion
+                })
+
+            fetch(`/api/?key=users_queue&index=${usersQueueIndex}&portion=${portion}`)
+                .then(response => response.json())
+                .then(data => {
+                    const usersList = document.getElementById('users-list')
+                    data.forEach(user => {
+                        const userElement = document.createElement('li')
+                        userElement.innerHTML = `<a href="#" onclick="letsPlay('${user[0]}')">User: ${user[0]}</a>`
+                        usersList.appendChild(userElement)
+                    })
+                    usersQueueIndex += portion
+                })
+        }
+
+        const letsPlay = (username) => {
+            fetch(`/api/lets_play?username=${username}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ username: username })
+            }).then(response => {
+                if (response.ok) {
+                    alert('Game request sent successfully!')
+                }
+            })
+        }
+
+        const getCookie = (name) => {
+            let cookieValue = null
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split('')
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim()
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1))
+                        break
+                    }
+                }
+            }
+            return cookieValue
+        }
+
+        window.onscroll = () => {
+            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight) {
+                loadMoreData()
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadMoreData)
+    </script>
 {% endblock %}
