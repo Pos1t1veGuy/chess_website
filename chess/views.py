@@ -17,7 +17,7 @@ class api(View):
 		key = request.GET.get('key')
 		match key:
 			case 'leaders':
-				order_by = json.loads(request.GET.get('order_by'))
+				order_by = json.loads(request.GET.get('order_by')) if request.GET.get('order_by') else None
 				if order_by and isinstance(order_by, (list, tuple)):
 					qs = User.objects.order_by(*order_by)
 				elif order_by and isinstance(order_by, str):
@@ -25,7 +25,16 @@ class api(View):
 				else:
 					qs = User.objects.order_by('global_score')
 
-				return self.objects_portion(request, [ [user.username, user.winrate, user.games_count, user.score] for user in qs ])
+				return self.objects_portion(request, [ {
+					'username': user.username,
+					'winrate': user.winrate,
+					'games_count': user.games_count,
+					'score': user.global_score
+				} for user in sorted(qs, key=lambda user: (
+					-user.winrate,
+					-user.games_count,
+					-user.global_score,
+				)) ])
 
 			case 'active_games':
 				return self.objects_portion(request, Game.objects.filter(ended=False).order_by('playing').values_list(
@@ -34,7 +43,12 @@ class api(View):
 
 			case 'users_queue':
 				from chess.consumers import queue_consumers
-				return self.objects_portion(request, [ [user.username, user.winrate, user.games_count, user.score] for user in queue_consumers ])
+				return self.objects_portion(request, [ {
+					'username': user.username,
+					'winrate': user.winrate,
+					'games_count': user.games_count,
+					'score': user.global_score
+				} for user in queue_consumers ])
 
 		raise Http404('')
 

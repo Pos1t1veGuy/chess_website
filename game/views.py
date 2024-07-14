@@ -13,10 +13,14 @@ def home(request):
 def hello(request):
     return render(request, 'hello.html', {'user': request.user})
 
-def leaders(request): # Доделать джаваскриптовую подгрузку списка
+def leaders(request):
 	leaders_url = request.build_absolute_uri(f'{reverse("api")}?key=leaders&portion={settings.LEADERS_PORTION}&index=0')
 	first_portion = json.loads(rq.get(leaders_url).content)
-	return render(request, 'leaders.html', {'user': request.user, 'users': User.objects.filter(username__in=first_portion), 'leaders_url': leaders_url[:-1]})
+	return render(request, 'leaders.html', {
+		'user': request.user,
+		'users': [ User.objects.get(username=user['username']) for user in first_portion ],
+		'leaders_url': leaders_url[:-1]
+	})
 
 def game(request, game_id: int):
 	game = get_object_or_404(Game, id=game_id)
