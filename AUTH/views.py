@@ -90,7 +90,6 @@ class edit(View):
                 'first_name': request.user.first_name,
                 'last_name': request.user.last_name,
                 'email': request.user.email,
-                'avatar': '',
             }, instance=request.user)})
         except User.DoesNotExist:
             raise Http404('')
@@ -98,6 +97,7 @@ class edit(View):
     @method_decorator(login_required(login_url='auth:auth'))
     @method_decorator(csrf_protect)
     def post(self, request):
+        old_email = request.user.email
         ep_form = EditProfileForm(request.POST, request.FILES, instance=request.user)
         
         if (not request.POST.get('password', None) and
@@ -110,7 +110,7 @@ class edit(View):
             return redirect_back(request, reverse('auth:edit_profile'))
 
         elif ep_form.is_valid():
-            if request.POST.get('password', None) != '' or request.POST.get('email', None) != request.user.email:
+            if request.POST.get('password', None) != '' or request.POST.get('email', None) != old_email:
                 request.session['ep_form'] = ep_form.serialize()
                 ep_form.send_code(request.user.email)
                 return redirect('auth:code')
@@ -120,8 +120,6 @@ class edit(View):
                 return redirect_back(request, reverse('auth:edit_profile'))
 
         else:
-            if request.POST.get('avatar', None) == request.user.avatar:
-                ep_form.fields['avatar'].initial = ''
             return render(request, 'edit_profile.html', {'user': request.user, 'form': ep_form})
 
 
@@ -155,7 +153,7 @@ class code(View):
                             data[key] = InMemoryUploadedFile(io, None, file, 'image/png', len(bytes_), None)
                             os.remove(settings.TEMP_MEDIA_DIR + file)
 
-                FormObject = getattr(form_module, cache_data['class_name'])(data=data, instance=request.user) # Уникальность
+                FormObject = getattr(form_module, cache_data['class_name'])(data=data, instance=request.user)
 
                 if FormObject.is_valid():
                     res = FormObject.save()
@@ -164,9 +162,10 @@ class code(View):
                         if cache_data['login_after']:
                             login(request, res)
 
+                    if 'redirect_after' in cache_data.keys():
+                        return redirect(cache_data['redirect_after'])
+
                     return redirect_back(request)
-                else:
-                    print(FormObject.errors)
 
         raise Http404('')
 

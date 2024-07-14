@@ -184,6 +184,8 @@ class EditProfileForm(forms.ModelForm):
                 'email': self.cleaned_data['email'],
                 'password': self.cleaned_data['password'],
             },
+            'login_after': True,
+            'redirect_after': 'auth:info',
         }
 
     def send_code(self, email: str):
