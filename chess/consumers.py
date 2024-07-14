@@ -195,8 +195,14 @@ class GameConsumer(AsyncWebsocketConsumer):
         global players_in_game
         if self.user in players_in_game:
             players_in_game.remove(self.user)
-        await self.send_opponent({'type': 'opponent_is_disconnected'})
         self.end = True
+
+        game = await sync_to_async(Game.objects.get)(id=self.game_id)
+        if game.starting:
+            self.give_up()
+        else:
+            await self.send_opponent({'type': 'opponent_is_disconnected'})
+
         self.close()
 
     async def receive(self, text_data):
@@ -209,10 +215,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         match mtype:
             case 'user_gave_up':
                 if not game.ended:
-                    if not game.playing:
-                        await sync_to_async(game.start)()
-                    await self.lose()
-                    await sync_to_async(game.give_up)(self.color)
+                    await self.give_up()
                 else:
                     await self.send(text_data=json.dumps({
                         'type': "redirect",
@@ -494,6 +497,13 @@ class GameConsumer(AsyncWebsocketConsumer):
                 'result': 'stalemate',
             })
         await self.disconnect(0)
+
+    async def give_up(self):
+        game = await sync_to_async(Game.objects.get)(id=self.game_id)
+        if not game.playing:
+            await sync_to_async(game.start)()
+        await self.lose()
+        await sync_to_async(game.give_up)(self.color)
 
     async def get_score(self) -> int:
         return await sync_to_async(lambda: self.score)()

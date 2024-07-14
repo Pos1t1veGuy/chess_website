@@ -715,6 +715,10 @@ class Game(models.Model):
 	def players(self) -> list:
 		return [self.white_player, self.black_player]
 
+	@property
+	def starting(self) -> bool:
+		return len(self.movements) == 1 and not self.playing
+
 	def __getitem__(self, pos) -> list:
 		if isinstance(pos, int):
 			return [ self.soft_movements[-1][y][pos] for y in range(8) ]
