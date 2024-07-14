@@ -1,9 +1,10 @@
 from typing import *
 
 from django.shortcuts import render
-from django.http import HttpResponse, Http404, FileResponse
+from django.http import HttpResponse, Http404, FileResponse, JsonResponse
 from django.views import View
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 
 from AUTH.models import User
 from game.models import Game
@@ -49,6 +50,27 @@ class api(View):
 					'games_count': user.games_count,
 					'score': user.global_score
 				} for user in queue_consumers ])
+
+			case 'game':
+				if 'id' in request.GET.keys():
+					if str(request.GET['id']).isdigit():
+						game = get_object_or_404(Game, id=int(request.GET['id']))
+						return JsonResponse({
+							'id': game.id,
+							'start_time': str(game.start_time),
+							'status': 0 if game.ended and not game.playing else (1 if not game.ended and not game.playing else 2),
+							'winner': game.winner,
+							'last_movement_time': str(game.last_movement_time),
+							'board': game.movements[-1],
+
+							'white_score': game.white_player_score,
+							'white_passed_time': game.white_player_score,
+							'destoyed_white_pieces': game.lost_pieces_by_color('white'),
+
+							'black_score': game.black_player_score,
+							'black_passed_time': game.black_player_score,
+							'destoyed_white_pieces': game.lost_pieces_by_color('black'),
+						})
 
 		raise Http404('')
 

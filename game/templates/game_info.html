@@ -4,7 +4,53 @@
 
 {% block content %}
 
-<!-- Передан game, который содержит данные об игре -->
+<style>
+    .board-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        overflow: hidden;
+    }
+
+    .board {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        grid-template-rows: repeat(8, 1fr);
+        margin: 0 20px;
+        width: 80vmin;
+        height: 80vmin;
+    }
+
+    .cell {
+        background-color: #FFF;
+        transition: background-color 0.15s;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .cell.black {
+        background-color: #888;
+    }
+
+    .cell.highlight {
+        background-color: #FFD700 !important;
+    }
+
+    .cell.available {
+        background-color: #32CD32 !important;
+    }
+
+    .piece {
+        width: 95%;
+        height: 95%;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+    }
+</style>
+
+
 Краткая инфа о игре:
     Белый
     <img src="{{ white.avatar.url }}" alt="Аватар {{ white.username }}" class="big-user-avatar">
@@ -15,9 +61,9 @@
     {% else %}
         @{{ white.username }}
     {% endif %}
-    Счет (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'white_score' -->)
-    Время (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'white_passed_time' -->) / {{ game.max_time }}
-    Потеряно фигур (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'destroyed_white_pieces' -->)
+    <p>Счет: <span id="white_score">...</span></p>
+    <p>Время: <span id="white_passed_time">...</span> / {{ game.max_time }}</p>
+    <p>Потеряно фигур: <span id="destroyed_white_pieces">...</span></p>
 
     Черный
     <img src="{{ black.avatar.url }}" alt="Аватар {{ black.username }}" class="big-user-avatar">
@@ -28,18 +74,120 @@
     {% else %}
         @{{ black.username }}
     {% endif %}
-    Счет (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'black_score' -->)
-    Время (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'black_passed_time' -->) / {{ game.max_time }}
-    Потеряно фигур (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'destroyed_black_pieces' -->)
+    <p>Счет: <span id="black_score">...</span></p>
+    <p>Время: <span id="black_passed_time">...</span> / {{ game.max_time }}</p>
+    <p>Потеряно фигур: <span id="destroyed_black_pieces">...</span></p>
 
-Победитель ... или Победитель пока не определен (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'winner' -->)
+<div class="game-summary">
+    <p id="winner">...</p>
+    <p>Последний ход был: <span id="last_movement_time">...</span></p>
+    <p>Начало игры: {{ game.start_time }}</p>
+    <p>Статус: <span id="game_status">...</span></p>
+</div>
 
-Последний ход был (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'last_movement_time' -->)
-Начало игры {{ game.start_time }}
-Игра продолжается или Игра окончена (<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'playing' bool и 'end_time' str/None -->)
+<div class="board-container">
+    <div class="board" id="board"></div>
+</div>
 
-<!-- Подгрузить джаваскриптом api/?key=game&id={game.id} словарь и достать ключ 'board' List[List[str]] -->
+<script>
+    const fetch_timer = 3000
+    const color = 'white'
+    const mirrored = true
 
-<!-- Нужно задизайнить под две карточки с краткой инфой в одной большой, слева - белый игрок, справа - черный игрок, снизу общая инфа об игре -->
+
+    const fetchData = () => {
+        fetch(`/api/?key=game&id={{ game.id }}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('white_score').textContent = data.white_score
+                document.getElementById('white_passed_time').textContent = data.white_passed_time
+                document.getElementById('destroyed_white_pieces').textContent = data.destroyed_white_pieces
+
+                document.getElementById('black_score').textContent = data.black_score
+                document.getElementById('black_passed_time').textContent = data.black_passed_time
+                document.getElementById('destroyed_black_pieces').textContent = data.destroyed_black_pieces
+
+                if (data.winner) {
+                    document.getElementById('winner').textContent = `Победил: ${data.winner}`
+                } else {
+                    document.getElementById('winner').textContent = 'Победитель пока не определен'
+                }
+
+                switch (data.status) {
+                    case 0:
+                        document.getElementById('game_status').textContent = 'Игра окончена'
+                        break
+                    case 1:
+                        document.getElementById('game_status').textContent = 'Игра приостановлена или не началась'
+                        break
+                    case 2:
+                        document.getElementById('game_status').textContent = 'Игра продолжается'
+                        break
+                }
+
+                document.getElementById('last_movement_time').textContent = data.last_movement_time
+
+                updatePieces(data.board)
+            })
+            .catch(error => console.error('Error fetching data:', error));
+    }
+
+    const createBoard = () => {
+        const board = document.getElementById('board')
+        for (let y = 0; y < 8; y++) {
+            for (let x = 0; x < 8; x++) {
+                const cell = document.createElement('div')
+                cell.className = 'cell'
+                if (color === 'white') {
+                    if ((x + y) % 2 === 0) {
+                        cell.className += ' black'
+                    }
+                } else {
+                    if ((x + y) % 2 !== 0) {
+                        cell.className += ' black'
+                    }
+                }
+                cell.dataset.x = x
+                cell.dataset.y = y
+                board.appendChild(cell)
+            }
+        }
+    }
+
+    const updatePieces = (boardLayout) => {
+        const cells = document.querySelectorAll('.cell')
+        for (let x = 0; x < 8; x++) {
+            for (let y = 0; y < 8; y++) {
+                const pieceName = boardLayout[x][y].toLowerCase()
+                const cell = cells[(mirrored ? 7 - x : x) * 8 + y]
+
+                if (pieceName) {
+                    if (cell.children.length === 0 || cell.children[0].dataset.pieceName !== pieceName) {
+                        if (cell.children.length > 0) {
+                            cell.removeChild(cell.children[0]);
+                        }
+                        const piece = document.createElement('div')
+                        piece.className = 'piece'
+                        piece.style.backgroundImage = `url("/media/modified_pieces/${pieceName.split(' ')[1]}_${pieceName.split(' ')[0]}.png")`
+                        piece.dataset.color = pieceName.split(' ')[1]
+                        piece.dataset.type = pieceName.split(' ')[0]
+                        piece.dataset.pieceName = pieceName
+                        cell.appendChild(piece)
+                    }
+                } else {
+                    if (cell.children.length > 0) {
+                        cell.removeChild(cell.children[0])
+                    }
+                }
+            }
+        }
+    }
+
+
+    setInterval(fetchData, fetch_timer)
+
+    createBoard()
+    fetchData()
+</script>
 
 {% endblock %}
