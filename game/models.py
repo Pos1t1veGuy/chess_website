@@ -433,8 +433,7 @@ class Game(models.Model):
 				return int(self.white_player_time)
 			else:
 				return int(self.black_player_time)
-		else:
-			return 0
+		return 0
 
 	@if_not_ended
 	@if_time_is_not_up

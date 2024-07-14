@@ -23,6 +23,19 @@ class GameConfig(AppConfig):
     queue_consumers = []
     revengers = {}
 
+    async def game_ender(self):
+        while True:
+            from game.models import Game
+            
+            games = await sync_to_async( lambda: list(Game.objects.filter(playing=True)) )()
+            for game in games:
+                if await sync_to_async(game.passed_time)('black') - await sync_to_async(lambda: game.max_time)() >= 10:
+                    await sync_to_async(game.end)('white', res='time')
+                if await sync_to_async(game.passed_time)('white') - await sync_to_async(lambda: game.max_time)() >= 10:
+                    await sync_to_async(game.end)('black', res='time')
+
+            await asyncio.sleep(1)
+
     async def game_revenger(self):
         while True:
             from chess.consumers import revengers
@@ -180,17 +193,14 @@ class GameConfig(AppConfig):
         from .models import Game
 
         print('Starting background game tasks...')
-        def start_game_starter_loop():
+        def start_loop(function: callable):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            loop.run_until_complete(self.game_starter())
-        def start_game_revenger_loop():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self.game_revenger())
+            loop.run_until_complete(function())
 
-        threading.Thread(target=start_game_starter_loop, daemon=True).start()
-        threading.Thread(target=start_game_revenger_loop, daemon=True).start()
+        threading.Thread(target=lambda: start_loop(self.game_ender), daemon=True).start()
+        threading.Thread(target=lambda: start_loop(self.game_starter), daemon=True).start()
+        threading.Thread(target=lambda: start_loop(self.game_revenger), daemon=True).start()
 
         is_different_names = settings.FILE_CACHE['pieces', 'images_names'] != os.listdir(settings.PIECES_DIR)
         is_different_index = settings.FILE_CACHE['pieces', 'images_hash'] != self.image_dataset_hash(settings.PIECES_DIR)
@@ -211,7 +221,7 @@ class GameConfig(AppConfig):
             settings.FILE_CACHE['pieces', 'icons_size'] = settings.ICONS_SIZE
 
         signal.signal(signal.SIGINT, self.shutdown)
-        if settings.DEBUG:
-            for game in Game.objects.all():
-                if game.ended:
-                    game.delete()
+        # if settings.DEBUG:
+        #     for game in Game.objects.all():
+        #         if game.ended:
+        #             game.delete()

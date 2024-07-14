@@ -43,7 +43,7 @@ class User(AbstractUser):
         if self.id:
             old_user = User.objects.get(pk=self.id)
 
-            if self.avatar and old_user.avatar != self.avatar:
+            if self.avatar and old_user.avatar != self.avatar and old_user.avatar.name != 'avatars/default_user.png':
                 old_user.avatar.delete()
 
         super(User, self).save(*args, **kwargs)

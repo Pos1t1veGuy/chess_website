@@ -41,7 +41,7 @@
                     const gamesList = document.getElementById('games-list')
                     data.forEach(game => {
                         const gameElement = document.createElement('li')
-                        gameElement.innerHTML = `<a href="{% url 'chess:home_redirect' %}/${game[0]}/info">Game ${game[2]} vs ${game[3]}</a>`
+                        gameElement.innerHTML = `<a href="{% url 'chess:home_redirect' %}${game[0]}/info">Game ${game[2]} vs ${game[3]}</a>`
                         gamesList.appendChild(gameElement)
                     })
                     activeGamesIndex += portion
