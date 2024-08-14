@@ -33,19 +33,24 @@
         let activeGamesIndex = 0
         let usersQueueIndex = 0
         const portion = 2
+        let loading = false
 
         const loadMoreData = () => {
+            if (loading) return
+            loading = true
+
             fetch(`/api/?key=active_games&index=${activeGamesIndex}&portion=${portion}`)
                 .then(response => response.json())
                 .then(data => {
                     const gamesList = document.getElementById('games-list')
                     data.forEach(game => {
                         const gameElement = document.createElement('li')
-                        gameElement.innerHTML = `<a href="{% url 'chess:home_redirect' %}${game[0]}/info">Game ${game[2]} vs ${game[3]}</a>`
+                        gameElement.innerHTML = `<a href="{% url 'chess:home_redirect' %}${game.id}/info">Game ${game.white_player} vs ${game.black_player}</a>`
                         gamesList.appendChild(gameElement)
                     })
                     activeGamesIndex += portion
                 })
+                .finally(() => loading = false)
 
             fetch(`/api/?key=users_queue&index=${usersQueueIndex}&portion=${portion}`)
                 .then(response => response.json())
@@ -53,11 +58,12 @@
                     const usersList = document.getElementById('users-list')
                     data.forEach(user => {
                         const userElement = document.createElement('li')
-                        userElement.innerHTML = `<a href="#" onclick="letsPlay('${user[0]}')">User: ${user[0]}</a>`
+                        userElement.innerHTML = `<a href="#" onclick="letsPlay('${user.username}')">User: ${user.username}</a>`
                         usersList.appendChild(userElement)
                     })
                     usersQueueIndex += portion
                 })
+                .finally(() => loading = false)
         }
 
         const letsPlay = (username) => {
@@ -76,9 +82,9 @@
         }
 
         const getCookie = (name) => {
-            let cookieValue = null
+            let cookieValue
             if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split('')
+                const cookies = document.cookie.split(';')
                 for (let i = 0; i < cookies.length; i++) {
                     const cookie = cookies[i].trim()
                     if (cookie.substring(0, name.length + 1) === (name + '=')) {

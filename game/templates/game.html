@@ -162,7 +162,7 @@
 </head>
 <body>
     <div class="header">
-        <button class="leave-button" onclick="leaveGame()">Покинуть игру</button>
+        <button class="leave-button" onclick="wannaLeave()">Покинуть игру</button>
     </div>
     <div class="main-container">
         <div class="players">
@@ -392,7 +392,23 @@
                 connectWebSocket()
                 updateNotifications(self_notifications, 'Переподключение...', () => !connected)
             }
-        };
+        }
+
+        const wannaLeave = () => {
+            Swal.fire({
+                title: 'Подтвердите действие',
+                text: 'Вы уверены, что хотите сдаться?',
+                showCancelButton: true,
+                confirmButtonText: 'Конечно',
+                cancelButtonText: 'Ни в коем случае',
+                willOpen: () => {
+                    const confirmButton = Swal.getConfirmButton()
+                    confirmButton.addEventListener('click', () => {
+                        leaveGame()
+                    })
+                }
+            })
+        }
 
         const leaveGame = () => {
             ws.send(JSON.stringify({

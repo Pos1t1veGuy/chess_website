@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'AUTH',
     'game',
 ]
@@ -139,6 +140,12 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 ICONS_DIR = f'{BASE_DIR}/media/icons/'.replace('\\', '/')
 ICONS_SIZE = (200, 200)
 TEMP_MEDIA_DIR = f'{BASE_DIR}/media/temp_avatars/'
+AVATARS_URL = f'{MEDIA_URL}avatars/'
+AVATARS_ROOT = os.path.join(MEDIA_ROOT, 'avatars')
+
+DEFAULT_AVATAR_NAME = 'default_user.png'
+DEFAULT_AVATAR_URL = f'{AVATARS_URL}/{DEFAULT_AVATAR_NAME}'
+DEFAULT_AVATAR_ROOT = os.path.join(AVATARS_ROOT, DEFAULT_AVATAR_NAME)
 
 AUTH_USER_MODEL = 'AUTH.User'
 ENABLED_USERNAME_CHARS = string.ascii_letters + string.digits + '_-'

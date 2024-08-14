@@ -6,97 +6,75 @@ from django.views import View
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 
-from AUTH.models import User
-from game.models import Game
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+
 import json
 import random
 import os
 
+from .serializers import UserSerializer, GameSerializer
+from .models import User, Game
 
-class api(View):
+
+class api(APIView):
 	def get(self, request):
-		key = request.GET.get('key')
+		key = request.query_params.get('key')
 		match key:
 			case 'leaders':
-				order_by = json.loads(request.GET.get('order_by')) if request.GET.get('order_by') else None
-				if order_by and isinstance(order_by, (list, tuple)):
-					qs = User.objects.order_by(*order_by)
-				elif order_by and isinstance(order_by, str):
-					qs = User.objects.order_by(order_by)
-				else:
-					qs = User.objects.order_by('global_score')
-
-				return self.objects_portion(request, [ {
-					'username': user.username,
-					'winrate': user.winrate,
-					'games_count': user.games_count,
-					'score': user.global_score
-				} for user in sorted(qs, key=lambda user: (
-					-user.winrate,
-					-user.games_count,
-					-user.global_score,
-				)) ])
-
+				return self.get_leaders(request)
 			case 'active_games':
-				return self.objects_portion(request, Game.objects.filter(ended=False).order_by('playing').values_list(
-					'id', 'start_time', 'white_player__username', 'black_player__username')
-				)
-
+				return self.get_active_games(request)
 			case 'users_queue':
-				from chess.consumers import queue_consumers
-				return self.objects_portion(request, [ {
-					'username': user.username,
-					'winrate': user.winrate,
-					'games_count': user.games_count,
-					'score': user.global_score
-				} for user in queue_consumers ])
-
+				return self.get_users_queue(request)
 			case 'game':
-				if 'id' in request.GET.keys():
-					if str(request.GET['id']).isdigit():
-						game = get_object_or_404(Game, id=int(request.GET['id']))
-						return JsonResponse({
-							'id': game.id,
-							'start_time': str(game.start_time),
-							'status': 0 if game.ended and not game.playing else (1 if not game.ended and not game.playing else 2),
-							'winner': game.winner,
-							'last_movement_time': str(game.last_movement_time),
-							'board': game.movements[-1],
+				return self.get_game(request)
+		return Response(status=status.HTTP_404_NOT_FOUND)
 
-							'white_score': game.white_player_score,
-							'white_passed_time': game.white_player_score,
-							'destoyed_white_pieces': game.lost_pieces_by_color('white'),
+	def get_leaders(self, request):
+		order_by = request.query_params.getlist('order_by') or ['global_score']
+		users = User.objects.order_by(*order_by)
+		users = sorted(users, key=lambda user: (
+			-user.winrate,
+			user.games_count,
+			user.global_score,
+		))[::-1]
+		return self.objects_portion(request, users, UserSerializer)
 
-							'black_score': game.black_player_score,
-							'black_passed_time': game.black_player_score,
-							'destoyed_white_pieces': game.lost_pieces_by_color('black'),
-						})
+	def get_active_games(self, request):
+		games = Game.objects.filter(ended=False).order_by('playing')
+		return self.objects_portion(request, games, GameSerializer)
 
-		raise Http404('')
+	def get_users_queue(self, request):
+		from chess.consumers import queue_consumers
+		return self.objects_portion(request, [ con.user for con in queue_consumers ], UserSerializer)
 
-	def objects_portion(self, request, queryset: Union['QuerySet', list]) -> 'HttpResponse':
-		portion = request.GET.get('portion')
-		index = request.GET.get('index')
-		if portion and index:
-			if portion.isdigit() and index.isdigit():
-				portion = int(portion)
-				index = int(index)
-				if 0 <= portion and 0 <= index:
-					if User.objects.count() <= index:
-						raise Http404('')
-					elif User.objects.count() <= portion:
-						return HttpResponse(json.dumps(list( queryset ), default=str))
-					elif User.objects.count() <= index + portion:
-						return HttpResponse(json.dumps(list( queryset[index:] ), default=str))
-					else:
-						return HttpResponse(json.dumps(list( queryset[index:index+portion] ), default=str))
-		elif index:
-			if index.isdigit():
-				index = int(index)
-				if 0 <= index <= User.objects.count():
-					return HttpResponse(json.dumps( list(queryset)[index] ))
+	def get_game(self, request):
+		game_id = request.query_params.get('id')
+		if game_id and game_id.isdigit():
+			game = get_object_or_404(Game, id=int(game_id))
+			serializer = GameSerializer(game)
+			return Response(serializer.data, status=status.HTTP_200_OK)
+		return Response(status=status.HTTP_404_NOT_FOUND)
 
-		raise Http404('')
+	def objects_portion(self, request, queryset, serializer_class):
+		portion = request.query_params.get('portion')
+		index = request.query_params.get('index')
+		if portion and index and portion.isdigit() and index.isdigit():
+			portion = int(portion)
+			index = int(index)
+			if 0 <= portion and 0 <= index:
+				sliced_queryset = queryset[index:index+portion]
+				serializer = serializer_class(sliced_queryset, many=True)
+				return Response(serializer.data, status=status.HTTP_200_OK)
+		elif index and index.isdigit():
+			index = int(index)
+			if 0 <= index < len(queryset):
+				serializer = serializer_class(queryset[index], many=False)
+				return Response(serializer.data, status=status.HTTP_200_OK)
+		return Response(status=status.HTTP_404_NOT_FOUND)
+
 
 def random_favicon(request):
 	try:

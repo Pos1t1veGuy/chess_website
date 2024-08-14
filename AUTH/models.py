@@ -28,13 +28,13 @@ class ModelUtils:
         return result_name
     
     def avatar_filename(instance, filename: str) -> str:
-        return ModelUtils.filename(f'avatars/{filename}')
+        return ModelUtils.filename(f'{settings.AVATARS_URL}{filename}')
 
 
 class User(AbstractUser):
     username = models.CharField(max_length=settings.MAX_USERNAME_LENGTH, unique=True)
     email = models.EmailField(unique=True, verbose_name='email')
-    avatar = models.ImageField(upload_to=ModelUtils.avatar_filename, default='avatars/default_user.png', verbose_name='Avatar Picture')
+    avatar = models.ImageField(upload_to=ModelUtils.avatar_filename, default=settings.DEFAULT_AVATAR_URL, verbose_name='Avatar Picture')
     last_updated = models.DateTimeField(auto_now=True, verbose_name='Last Update')
     global_score = models.IntegerField(default=0, verbose_name='Global Score')
     level = models.IntegerField(default=1, verbose_name='Level')
@@ -43,7 +43,7 @@ class User(AbstractUser):
         if self.id:
             old_user = User.objects.get(pk=self.id)
 
-            if self.avatar and old_user.avatar != self.avatar and old_user.avatar.name != 'avatars/default_user.png':
+            if self.avatar and old_user.avatar != self.avatar and old_user.avatar.name != settings.DEFAULT_AVATAR_URL:
                 old_user.avatar.delete()
 
         super(User, self).save(*args, **kwargs)

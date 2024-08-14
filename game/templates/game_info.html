@@ -127,9 +127,8 @@
 
                 document.getElementById('last_movement_time').textContent = data.last_movement_time
 
-                updatePieces(data.board)
+                updatePieces(data.movements[data.movements.length-1])
             })
-            .catch(error => console.error('Error fetching data:', error));
     }
 
     const createBoard = () => {

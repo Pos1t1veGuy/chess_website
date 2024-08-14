@@ -421,19 +421,19 @@ class GameConsumer(AsyncWebsocketConsumer):
             'lost_pieces': len(lost_pieces[0]),
             'opponent_lost_pieces': len(lost_pieces[1]),
             'lost_price': sum([ piece.price for piece in lost_pieces[0] ]),
-            'opponent_lost_piece': sum([ piece.price for piece in lost_pieces[1] ]),
+            'opponent_lost_price': sum([ piece.price for piece in lost_pieces[1] ]),
             'result': 'lose',
         }))
         if not last_msg:
             await self.send_opponent({
                 'type': 'end_info',
-                'score': await self.get_score(),
+                'score': await self.get_opponent_score(),
                 'time': await sync_to_async(game.passed_time)(self.opponent_color),
                 'movement_count': await sync_to_async(lambda: game.movement_count)(),
                 'lost_pieces': len(lost_pieces[1]),
                 'opponent_lost_pieces': len(lost_pieces[0]),
                 'lost_price': sum([ piece.price for piece in lost_pieces[1] ]),
-                'opponent_lost_piece': sum([ piece.price for piece in lost_pieces[0] ]),
+                'opponent_lost_price': sum([ piece.price for piece in lost_pieces[0] ]),
                 'result': 'win',
             })
         await self.disconnect(0)
@@ -451,19 +451,19 @@ class GameConsumer(AsyncWebsocketConsumer):
             'lost_pieces': len(lost_pieces[0]),
             'opponent_lost_pieces': len(lost_pieces[1]),
             'lost_price': sum([ piece.price for piece in lost_pieces[0] ]),
-            'opponent_lost_piece': sum([ piece.price for piece in lost_pieces[1] ]),
+            'opponent_lost_price': sum([ piece.price for piece in lost_pieces[1] ]),
             'result': 'win',
         }))
         if not last_msg:
             await self.send_opponent({
                 'type': 'end_info',
-                'score': await self.get_score(),
+                'score': await self.get_opponent_score(),
                 'time': await sync_to_async(game.passed_time)(self.opponent_color),
                 'movement_count': await sync_to_async(lambda: game.movement_count)(),
                 'lost_pieces': len(lost_pieces[1]),
                 'opponent_lost_pieces': len(lost_pieces[0]),
                 'lost_price': sum([ piece.price for piece in lost_pieces[1] ]),
-                'opponent_lost_piece': sum([ piece.price for piece in lost_pieces[0] ]),
+                'opponent_lost_price': sum([ piece.price for piece in lost_pieces[0] ]),
                 'result': 'lose',
             })
         await self.disconnect(0)
@@ -481,19 +481,19 @@ class GameConsumer(AsyncWebsocketConsumer):
             'lost_pieces': len(lost_pieces[0]),
             'opponent_lost_pieces': len(lost_pieces[1]),
             'lost_price': sum([ piece.price for piece in lost_pieces[0] ]),
-            'opponent_lost_piece': sum([ piece.price for piece in lost_pieces[1] ]),
+            'opponent_lost_price': sum([ piece.price for piece in lost_pieces[1] ]),
             'result': 'stalemate',
         }))
         if not last_msg:
             await self.send_opponent({
                 'type': 'end_info',
-                'score': await self.get_score(),
+                'score': await self.get_opponent_score(),
                 'time': await sync_to_async(game.passed_time)(self.opponent_color),
                 'movement_count': await sync_to_async(lambda: game.movement_count)(),
                 'lost_pieces': len(lost_pieces[1]),
                 'opponent_lost_pieces': len(lost_pieces[0]),
                 'lost_price': sum([ piece.price for piece in lost_pieces[1] ]),
-                'opponent_lost_piece': sum([ piece.price for piece in lost_pieces[0] ]),
+                'opponent_lost_price': sum([ piece.price for piece in lost_pieces[0] ]),
                 'result': 'stalemate',
             })
         await self.disconnect(0)
@@ -507,6 +507,8 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     async def get_score(self) -> int:
         return await sync_to_async(lambda: self.score)()
+    async def get_opponent_score(self) -> int:
+        return await sync_to_async(lambda: self.opponent_score)()
 
     @property
     def score(self) -> int:
@@ -514,6 +516,13 @@ class GameConsumer(AsyncWebsocketConsumer):
         if self.user == game.white_player:
             return game.white_player_score
         elif self.user == game.black_player:
+            return game.black_player_score
+    @property
+    def opponent_score(self) -> int:
+        game = Game.objects.get(id=self.game_id)
+        if self.user != game.white_player:
+            return game.white_player_score
+        elif self.user != game.black_player:
             return game.black_player_score
 
     def __str__(self):
