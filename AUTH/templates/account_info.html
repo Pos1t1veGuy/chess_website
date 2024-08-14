@@ -3,23 +3,80 @@
 {% block title %}Аккаунт {{ account.username }}{% endblock %}
 
 {% block content %}
+<style>
+    .profile-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+    }
 
-{% if account != None %}
-    <h2>@{{ account.username }}</h2>
-    <img src="{{ account.avatar.url }}" alt="Твой аватар" class="big-user-avatar">
-    <p>{{ account.first_name }} {{ account.last_name }}</p>
+    .profile-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
 
-    {% if account.is_superuser %}
-        <p>ОН ЗДЕСЬ ПАПОЧКА!</p>
-    {% elif account.is_staff %}
-        <p>Крутышка сотрудник</p>
+    .profile-avatar {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        margin-bottom: 20px;
+    }
+
+    .profile-info {
+        text-align: center;
+    }
+
+    .profile-info h2 {
+        margin: 0;
+    }
+
+    .profile-info p {
+        margin: 5px 0;
+    }
+
+    .profile-status {
+        margin: 15px 0;
+        font-weight: bold;
+        color: #555;
+    }
+
+    .profile-actions {
+        margin-top: 20px;
+    }
+
+    .profile-actions a {
+        text-decoration: none;
+        color: #0066cc;
+    }
+</style>
+
+<div class="profile-container">
+    {% if account != None %}
+        <div class="profile-header">
+            <img src="{{ account.avatar.url }}" alt="Твой аватар" class="profile-avatar">
+            <div class="profile-info">
+                <h2>@{{ account.username }}</h2>
+                <p>{{ account.first_name }} {{ account.last_name }}</p>
+                <p class="profile-status">
+                    {% if account.is_superuser %}
+                        ОН ЗДЕСЬ ПАПОЧКА!
+                    {% elif account.is_staff %}
+                        Крутышка сотрудник
+                    {% else %}
+                        смертный
+                    {% endif %}
+                </p>
+                <p>Последнее обновление {{ account.last_updated }}</p>
+            </div>
+        </div>
+        <div class="profile-actions">
+            <a href="{% url 'auth:edit_profile' %}">Редактировать профиль</a>
+        </div>
     {% else %}
-        <p>смертный</p>
+        <p>Такого пользователя не существует</p>
     {% endif %}
-    <a href="{% url 'auth:edit_profile' %}">Редактировать профиль</a>
-    <p>Последнее обновление {{ account.last_updated }}</p>
-{% else %}
-    <p>Такого пользователя не существует</p>
-{% endif %}
+</div>
 
 {% endblock %}

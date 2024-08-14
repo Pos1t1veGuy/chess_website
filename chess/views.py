@@ -37,9 +37,9 @@ class api(APIView):
 		users = User.objects.order_by(*order_by)
 		users = sorted(users, key=lambda user: (
 			-user.winrate,
-			user.games_count,
-			user.global_score,
-		))[::-1]
+			-user.games_count,
+			-user.global_score,
+		))
 		return self.objects_portion(request, users, UserSerializer)
 
 	def get_active_games(self, request):

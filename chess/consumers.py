@@ -3,9 +3,9 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.core.cache import cache
 from asgiref.sync import sync_to_async
 from django.urls import reverse
+from datetime import datetime
 
-from AUTH.models import User
-from game.models import Game
+from .models import User, Game, Message
 from game.pieces import string_pieces
 import traceback
 import functools
@@ -62,7 +62,7 @@ class QueueConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         await self.remove_from_queue()
         self.end = True
-        self.close()
+        await self.close()
 
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -140,7 +140,7 @@ class QueueConsumer(AsyncWebsocketConsumer):
             self.black_list.append(self.opponent)
 
     def __str__(self):
-        return f'Queue[{self.user.username}, accepted={self.ready}, clicked={self.clicked}]'
+        return f'{self.__class__.__name__}[{self.user.username}, accepted={self.ready}, clicked={self.clicked}]'
     def __repr__(self):
         return str(self)
 
@@ -203,7 +203,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         else:
             await self.send_opponent({'type': 'opponent_is_disconnected'})
 
-        self.close()
+        await self.close()
 
     async def receive(self, text_data):
         global revengers
@@ -526,6 +526,65 @@ class GameConsumer(AsyncWebsocketConsumer):
             return game.black_player_score
 
     def __str__(self):
-        return f'GameConsumer[{self.user.username}, color={self.color}, score={self.score}]'
+        return f'{self.__class__.__name__}[{self.user.username}, color={self.color}, score={self.score}]'
+    def __repr__(self):
+        return str(self)
+
+
+class ChatConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.user = self.scope['user']
+        self.room_name = 'chat_room'
+        self.messages = []
+
+        await self.accept()
+        await self.channel_layer.group_add(self.room_name, self.channel_name)
+        
+        messages = await sync_to_async(Message.objects.all)()
+        length = await sync_to_async(messages.count)()
+        if length >= 50:
+            messages = messages[length-50:length]
+
+        messages = await sync_to_async( lambda: list(messages) )()
+
+        for msg in messages:
+            await self.chat_message(await sync_to_async(msg.serealize)())
+    
+    async def disconnect(self, close_code):
+        if self.user.is_authenticated:
+            await self.channel_layer.group_discard(self.room_name, self.channel_name)
+        await self.close()
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        mtype = data['type']
+
+        match mtype:
+            case 'send-message':
+                if self.user.is_authenticated:
+                    msg = await sync_to_async(Message.objects.create)(author=self.user, content=data['content'])
+                    await self.channel_layer.group_send(self.room_name, {
+                        'type': 'chat_message',
+                        **(await sync_to_async(msg.serealize)())
+                    })
+                    self.messages.append(msg)
+                else:
+                    await self.send(text_data=json.dumps({
+                        'type': 'error',
+                        'info': 'only registered users can use a chat'
+                    }))
+                    await self.disconnect(0)
+
+    async def chat_message(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'message-sent',
+            'content': event['content'],
+            'username': event['author'],
+            'avatar': event['author_avatar'],
+            'date_sent': event['date_sent'],
+        }))
+
+    def __str__(self):
+        return f'{self.__class__.__name__}[{self.user.username}, messages={len(self.messages)}]'
     def __repr__(self):
         return str(self)

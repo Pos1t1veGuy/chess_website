@@ -5,10 +5,29 @@
 {% block content %}
 
 <style>
-    .board-container {
+    .game-container {
         display: flex;
-        flex-direction: column;
+        justify-content: space-around;
         align-items: center;
+        padding: 20px;
+    }
+
+    .player-info {
+        flex: 1;
+        max-width: 200px;
+        text-align: center;
+    }
+
+    .player-info img {
+        width: 100%;
+        height: auto;
+        border-radius: 50%;
+    }
+
+    .board-container {
+        flex: 2;
+        display: flex;
+        justify-content: center;
         overflow: hidden;
     }
 
@@ -16,67 +35,73 @@
         display: grid;
         grid-template-columns: repeat(8, 1fr);
         grid-template-rows: repeat(8, 1fr);
-        margin: 0 20px;
-        width: 80vmin;
-        height: 80vmin;
+        width: 60vmin;
+        height: 60vmin;
     }
 
     .cell {
         background-color: #FFF;
-        transition: background-color 0.15s;
         display: flex;
         justify-content: center;
         align-items: center;
+        border: 1px solid #ccc;
     }
 
     .cell.black {
         background-color: #888;
     }
 
-    .cell.highlight {
-        background-color: #FFD700 !important;
-    }
-
-    .cell.available {
-        background-color: #32CD32 !important;
-    }
-
     .piece {
-        width: 95%;
-        height: 95%;
+        width: 90%;
+        height: 90%;
         background-size: contain;
         background-repeat: no-repeat;
         background-position: center;
     }
+
+    .game-summary {
+        text-align: center;
+        margin-top: 20px;
+    }
 </style>
 
+<div class="game-container">
+    <div class="player-info">
+        <img src="{{ white.avatar.url }}" alt="Аватар {{ white.username }}">
+        <h3>
+            {% if white.first_name != '' and white.last_name != '' %}
+                {{ white.first_name }} {{ white.last_name }}
+            {% elif white.first_name != '' and white.last_name == '' %}
+                {{ white.first_name }}
+            {% else %}
+                @{{ white.username }}
+            {% endif %}
+        </h3>
+        <p>Счет: <span id="white_score">...</span></p>
+        <p>Время: <span id="white_passed_time">...</span> / {{ game.max_time }}</p>
+        <p>Потеряно фигур: <span id="destroyed_white_pieces">...</span></p>
+    </div>
 
-Краткая инфа о игре:
-    Белый
-    <img src="{{ white.avatar.url }}" alt="Аватар {{ white.username }}" class="big-user-avatar">
-    {% if white.first_name != '' and white.last_name != '' %}
-        {{ white.first_name }} {{ white.last_name }}
-    {% elif white.first_name != '' and white.last_name == '' %}
-        {{ white.first_name }}
-    {% else %}
-        @{{ white.username }}
-    {% endif %}
-    <p>Счет: <span id="white_score">...</span></p>
-    <p>Время: <span id="white_passed_time">...</span> / {{ game.max_time }}</p>
-    <p>Потеряно фигур: <span id="destroyed_white_pieces">...</span></p>
+    <div class="board-container">
+        <div class="board" id="board"></div>
+    </div>
 
-    Черный
-    <img src="{{ black.avatar.url }}" alt="Аватар {{ black.username }}" class="big-user-avatar">
-    {% if black.first_name != '' and black.last_name != '' %}
-        {{ black.first_name }} {{ black.last_name }}
-    {% elif black.first_name != '' and black.last_name == '' %}
-        {{ black.first_name }}
-    {% else %}
-        @{{ black.username }}
-    {% endif %}
-    <p>Счет: <span id="black_score">...</span></p>
-    <p>Время: <span id="black_passed_time">...</span> / {{ game.max_time }}</p>
-    <p>Потеряно фигур: <span id="destroyed_black_pieces">...</span></p>
+    <div class="player-info">
+        <img src="{{ black.avatar.url }}" alt="Аватар {{ black.username }}">
+        <h3>
+            {% if black.first_name != '' and black.last_name != '' %}
+                {{ black.first_name }} {{ black.last_name }}
+            {% elif black.first_name != '' and black.last_name == '' %}
+                {{ black.first_name }}
+            {% else %}
+                @{{ black.username }}
+            {% endif %}
+        </h3>
+        <p>Счет: <span id="black_score">...</span></p>
+        <p>Время: <span id="black_passed_time">...</span> / {{ game.max_time }}</p>
+        <p>Потеряно фигур: <span id="destroyed_black_pieces">...</span></p>
+    </div>
+</div>
 
 <div class="game-summary">
     <p id="winner">...</p>
@@ -85,27 +110,22 @@
     <p>Статус: <span id="game_status">...</span></p>
 </div>
 
-<div class="board-container">
-    <div class="board" id="board"></div>
-</div>
-
 <script>
     const fetch_timer = 3000
     const color = 'white'
     const mirrored = true
 
-
     const fetchData = () => {
         fetch(`/api/?key=game&id={{ game.id }}`)
             .then(response => response.json())
             .then(data => {
-                document.getElementById('white_score').textContent = data.white_score
+                document.getElementById('white_score').textContent = data.white_player_score
                 document.getElementById('white_passed_time').textContent = data.white_passed_time
-                document.getElementById('destroyed_white_pieces').textContent = data.destroyed_white_pieces
+                document.getElementById('destroyed_white_pieces').textContent = data.destroyed_white_pieces.length
 
-                document.getElementById('black_score').textContent = data.black_score
+                document.getElementById('black_score').textContent = data.black_player_score
                 document.getElementById('black_passed_time').textContent = data.black_passed_time
-                document.getElementById('destroyed_black_pieces').textContent = data.destroyed_black_pieces
+                document.getElementById('destroyed_black_pieces').textContent = data.destroyed_black_pieces.length
 
                 if (data.winner) {
                     document.getElementById('winner').textContent = `Победил: ${data.winner}`
@@ -113,16 +133,12 @@
                     document.getElementById('winner').textContent = 'Победитель пока не определен'
                 }
 
-                switch (data.status) {
-                    case 0:
-                        document.getElementById('game_status').textContent = 'Игра окончена'
-                        break
-                    case 1:
-                        document.getElementById('game_status').textContent = 'Игра приостановлена или не началась'
-                        break
-                    case 2:
-                        document.getElementById('game_status').textContent = 'Игра продолжается'
-                        break
+                if (data.ended && !data.playing) {
+                    document.getElementById('game_status').textContent = 'Игра окончена'
+                } else if (!data.ended && !data.playing) {
+                    document.getElementById('game_status').textContent = 'Игра приостановлена или не началась'
+                } else {
+                    document.getElementById('game_status').textContent = 'Игра продолжается'
                 }
 
                 document.getElementById('last_movement_time').textContent = data.last_movement_time
@@ -163,7 +179,7 @@
                 if (pieceName) {
                     if (cell.children.length === 0 || cell.children[0].dataset.pieceName !== pieceName) {
                         if (cell.children.length > 0) {
-                            cell.removeChild(cell.children[0]);
+                            cell.removeChild(cell.children[0])
                         }
                         const piece = document.createElement('div')
                         piece.className = 'piece'
@@ -181,7 +197,6 @@
             }
         }
     }
-
 
     setInterval(fetchData, fetch_timer)
 

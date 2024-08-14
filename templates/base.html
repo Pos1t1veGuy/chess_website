@@ -27,6 +27,98 @@
         main {
             padding: 20px;
         }
+
+        .chat-container {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            width: 250px;
+            height: 400px;
+            background-color: #f1f1f1;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background-color: #333;
+            color: white;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        .chat-message {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 4px;
+        }
+
+        .chat-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+            user-select: none;
+            pointer-events: auto;
+        }
+
+        .chat-username {
+            font-weight: bold;
+        }
+
+        .chat-content {
+            background-color: #fff;
+            padding: 5px;
+            border-radius: 5px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            max-width: 200px;
+        }
+
+        .chat-timestamp {
+            font-size: 0.8em;
+            color: #999;
+        }
+
+        .chat-message.sender {
+            background-color: #e6f7ff;
+            align-self: flex-end;
+        }
+
+        .chat-message.sender .chat-content {
+            background-color: #cce7ff;
+        }
+
+        .chat-input-container {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #ccc;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-send-button {
+            margin-left: 5px;
+            padding: 10px 10px;
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
     </style>
     {% block header %}{% endblock %}
 </head>
@@ -83,7 +175,26 @@
         {% block content %}{% endblock %}
     </main>
 
+    <div class="chat-container">
+        <div class="chat-header">Чат</div>
+        <div id="chat-messages" class="chat-messages"></div>
+        <div class="chat-input-container">
+            {% if user.is_authenticated %}
+                <input type="text" id="chat-input" class="chat-input" placeholder="Введите сообщение...">
+                <button id="chat-send-button" class="chat-send-button">></button>
+            {% else %}
+                <p>Только зарегестрированные пользователи могут отправлять сообщения</p>
+                <li><a href="{% url 'auth:auth' %}">Регистрация/Вход</a></li>
+            {% endif %}
+        </div>
+    </div>
+
     <script>
+        let ws_chat = new WebSocket('ws://' + window.location.host + '/ws/chat/')
+        const chatMessages = document.getElementById('chat-messages')
+        const chatInput = document.getElementById('chat-input')
+        const self_username = '{{ user.username }}'
+
         {% if not user.is_in_game %}
             let ws
             let search_timerInterval
@@ -296,6 +407,52 @@
             const continue_game = () => {
                 window.location.href =  '/games/{{ user.active_game.id }}'
             }
+        {% endif %}
+
+        const addMessageToChat = (username, avatar, message, date_sent, profileUrl) => {
+            const chatMessage = `
+                <div class="${username === self_username ? 'chat-message sender' : 'chat-message'}">
+                    <a href="/account/@${username}" class="chat-avatar-link">
+                        <img src="${avatar}" class="chat-avatar" alt="Аватар ${username}">
+                    </a>
+                    <div class="chat-content">
+                        <p class="chat-username">${username}</p>
+                        <p>${message}</p>
+                        <span class="chat-timestamp">${date_sent}</span>
+                    </div>
+                </div>
+            `
+
+            chatMessages.innerHTML += chatMessage
+            chatMessages.scrollTop = chatMessages.scrollHeight
+        }
+
+        ws_chat.onmessage = (event) => {
+            const data = JSON.parse(event.data)
+            if (data.type === 'message-sent') {
+                addMessageToChat(data.username, data.avatar, data.content, data.date_sent)
+            }
+        }
+
+        {% if user.is_authenticated %}
+            const chatSendButton = document.getElementById('chat-send-button')
+            chatSendButton.onclick = () => {
+                const message = chatInput.value
+                if (message.trim() !== '') {
+                    ws_chat.send(JSON.stringify({
+                        'type': 'send-message',
+                        'content': message,
+                    }))
+                    chatInput.value = ''
+                }
+            }
+
+            chatInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && chatInput.value.trim() !== '') {
+                    event.preventDefault()
+                    chatSendButton.click()
+                }
+            })
         {% endif %}
     </script>
 </body>

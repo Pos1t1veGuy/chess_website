@@ -113,3 +113,17 @@ class User(AbstractUser):
     @property
     def available_game(self) -> 'Game':
         return self.get_active_game
+
+
+class Message(models.Model):
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='messages', verbose_name='Author')
+    content = models.CharField(null=True, max_length=300)
+    date_sent = models.DateTimeField(auto_now=True, verbose_name='Creation Time')
+
+    def serealize(self) -> dict:
+        return {
+            'author': self.author.username,
+            'author_avatar': self.author.avatar.url,
+            'content': self.content,
+            'date_sent': str(self.date_sent.strftime("%d/%m/%Y, %H:%M:%S")),
+        }
