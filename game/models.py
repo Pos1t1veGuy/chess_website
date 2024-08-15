@@ -92,7 +92,7 @@ class Game(models.Model):
 	winner = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='winner', verbose_name='Winner')
 
 	white_player_time = models.IntegerField(default=0, verbose_name='White PLayer Time (seconds)')
-	black_player_time = models.IntegerField(default=0, verbose_name='White PLayer Time (seconds)  ')
+	black_player_time = models.IntegerField(default=0, verbose_name='White PLayer Time (seconds)')
 
 	white_player_score = models.IntegerField(default=0, verbose_name='White PLayer Score')
 	black_player_score = models.IntegerField(default=0, verbose_name='White PLayer Score')
@@ -158,13 +158,9 @@ class Game(models.Model):
 
 		new_movement = self.make_movement(last_movement, _from, _to, reg_destroyed_pieces=True)
 		if (list(_from), list(_to)) in save_king_movements or not (tuple(_from), tuple(_to)) in all_movements:
-			if not predict_score:
-				if first_movement:
-					self.start()
-				self.set_scores(new_movement, self.color, start_score, destroyed_piece, transformed_pawn=False)
-				self.save_movement(new_movement)
-			else:
-				return self.get_movement_score(new_movement, self.color, start_score, destroyed_piece, transformed_pawn=False)
+			if first_movement:
+				self.start()
+			self.save_movement(new_movement)
 		else:
 			formatted_save_movements = '\n'.join([
 				f'{i+1}. [{movement[0]} -> {movement[1]}]' for i, movement in enumerate(save_king_movements)
@@ -201,22 +197,14 @@ class Game(models.Model):
 						raise ValueError("The game is not started")
 
 					last_movement[obj.x][0] = to(obj.color, pos=[obj.x][0])
-					if not predict_score:
-						if len(self.get_save_king_movements(self.color)) == 0:
-							self.end(win='black' if self.color == 'white' else 'white', res='checkmate')
-						self.set_scores(last_movement, self.color, start_score, [], transformed_pawn=True)
-						self.save_movement(last_movement)
-					else:
-						return self.get_movement_score(last_movement, self.color, start_score, [], transformed_pawn=True)
+					if len(self.get_save_king_movements(self.color)) == 0:
+						self.end(win='black' if self.color == 'white' else 'white', res='checkmate')
+					self.save_movement(last_movement)
 
 				elif obj.color == 'black' and obj.pos[1] in [6, 7]:
 
 					last_movement[obj.x][7] = to(obj.color, pos=[obj.x][7])
-					if not predict_score:
-						self.set_scores(last_movement, self.color, start_score, [], transformed_pawn=True)
-						self.save_movement(last_movement)
-					else:
-						return self.get_movement_score(last_movement, self.color, start_score, [], transformed_pawn=True)
+					self.save_movement(last_movement)
 
 				else:
 					raise ValueError(f'{str(obj)} at {obj.pos} can not be transformated')
@@ -285,13 +273,9 @@ class Game(models.Model):
 								new_movement = self.piece_set_pos(king.pos, [0,2], movement=new_movement)
 								new_movement = self.piece_set_pos([0,0], [3,0], movement=new_movement)
 
-				if not predict_score:
-					if len(self.get_save_king_movements(self.color)) == 0:
-						self.end(win='black' if self.color == 'white' else 'white', res='checkmate')
-					self.set_scores(new_movement, self.color, start_score, [], transformed_pawn=False)
-					self.save_movement(new_movement)
-				else:
-					return self.get_movement_score(new_movement, self.color, start_score, [], transformed_pawn=False)
+				if len(self.get_save_king_movements(self.color)) == 0:
+					self.end(win='black' if self.color == 'white' else 'white', res='checkmate')
+				self.save_movement(new_movement)
 
 			else:
 				raise ValueError(f"You can not make castling because you are already moved 2 rooks or 1 rook & king")
@@ -327,17 +311,6 @@ class Game(models.Model):
 			raise ValueError('Game must have 2 king for white and black players at board')
 
 		return last_movement
-
-	@if_not_ended
-	@if_time_is_not_up
-	def set_scores(self, *args, **kwargs):
-		score = self.get_movement_score(*args, **kwargs)
-		if self.color == 'white':
-			self.white_player_score += score
-			self.black_player_score -= score*.2
-		else:
-			self.black_player_score += score
-			self.white_player_score -= score*.2
 
 	@if_not_ended
 	@if_time_is_not_up
@@ -464,10 +437,13 @@ class Game(models.Model):
 		else:
 			self.winner = None
 
+		self.white_player_score = self.result_score('white', self.winner)
+		self.black_player_score = self.result_score('black', self.winner)
+		self.white_player.score += self.white_player_score
+		self.black_player.score += self.black_player_score
+
 		self.ended = True
 		self.playing = False
-		self.white_player.global_score += self.white_player_score
-		self.black_player.global_score += self.black_player_score
 
 		if self.movement_count > 0:
 			timedelta = (self.end_time - self.last_movement_time).total_seconds()
@@ -486,7 +462,7 @@ class Game(models.Model):
 		elif self.black_player == user:
 			return 'black'
 
-	def get_user_by_user(self, color: str) -> 'User':
+	def get_user_by_color(self, color: str) -> 'User':
 		if color == 'white':
 			return self.white_player
 		elif color == 'black':
@@ -497,107 +473,6 @@ class Game(models.Model):
 			return self.black_player
 		elif user == self.black_player:
 			return self.white_player
-
-	def get_movement_score(self, movement: list, player: str, start_score: int, destoyed_enemy_piece: list, transformed_pawn: bool = False):
-		'''
-		Points are awarded as a plus to the rewarded player and as a minus to the opponent,
-		depending on the effectiveness of the rewarded player’s last move.
-		The effectiveness of the last move is calculated according to the following criteria:
-
-		1. (30%) Destroyed enemy piece price;
-		2. (~45%) Number of pieces;
-			on player side of the board - 10%,
-			on the center of the board - 45%,
-			on the enemy side of the board - 80%;
-		3. (50%) (Player destroyed pieces price)/(Enemy destroyed pieces price) throughout the game;
-		4. (50%) (Enemy passed time)/(Player passed time) throughout the game;
-		5. (20%) For check to enemy king;
-		6. (40%) For mate to enemy king;
-		7. (90%) For control of the enemy half of the board, if player pieces can move there
-		8. (~65%) For forks, default pieces - 50%, Queen or King - 80%
-
-		The opponent's player will have 50% of the awarded player's effectiveness deducted
-		'''
-		friend_pieces = []
-		enemy_pieces = []
-
-		w1 = destoyed_enemy_piece.price * .3 if isinstance(destoyed_enemy_piece, Piece) else 0
-
-		frind_side = []
-		center = []
-		enemy_side = []
-
-		for line in movement:
-			for piece in line:
-				if isinstance(piece, Piece):
-					if piece.color == player:
-						if (piece.y in [0,1,2] and piece.color == 'white') or (piece.y in [7,6,5] and piece.color == 'black'):
-							enemy_side.append(piece)
-						elif (piece.y in [7,6,5] and piece.color == 'white') or (piece.y in [0,1,2] and piece.color == 'black'):
-							frind_side.append(piece)
-						else:
-							center.append(piece)
-
-						friend_pieces.append(piece)
-					else:
-						enemy_pieces.append(piece)
-
-		w2_1, w2_2, w2_3 = len(frind_side)*.1, len(center)*.45, len(enemy_side)*.8
-		w2 = w2_1 + w2_2 + w2_3
-
-		dp1, dp2 = self.lost_pieces_by_color(player), self.lost_pieces_by_color('white' if player == 'black' else 'white')
-
-		w3 = 0
-		if sum([ piece.price for piece in dp1 ]) > 0:
-			if sum([ piece.price for piece in dp2 ]) == 0:
-				w3 = 1
-			else:
-				w3 = sum([ piece.price for piece in dp1 ]) / sum([ piece.price for piece in dp2 ])
-
-		if self.passed_time('white' if player == 'black' else 'white') != 0:
-			w4 = self.passed_time(player) / self.passed_time('white' if player == 'black' else 'white')
-		else:
-			w4 = 0
-
-
-		kings = []
-		for y, line in enumerate(movement):
-			for x, piece in enumerate(line):
-				if isinstance(piece, King):
-					kings.append(piece)
-
-		if len(kings) != 2 or not ('white' in [ king.color for king in kings ] and 'black' in [ king.color for king in kings ]):
-			raise ValueError('Game must have 2 king for white and black players at board')
-
-		w5 = int([ king for king in kings if king.color != player ][0].check)*.2
-		w6 = int([ king for king in kings if king.color != player ][0].mate)*.4
-
-		w7 = 0
-		enemy_board_positions = [(0,0), (7,2)] if player == 'white' else [(0,5), (7,7)]
-		for piece in friend_pieces:
-			if enemy_board_positions[0][0] <= piece.x <= enemy_board_positions[1][0]:
-				if enemy_board_positions[0][1] <= piece.y <= enemy_board_positions[1][1]:
-					w7 += 1
-		w7 *= .9
-
-		enemy_dp_positions = [ piece.pos for piece in enemy_pieces if not isinstance(piece, (King, Queen)) ]
-		enemy_kq_positions = [ piece.pos for piece in enemy_pieces if isinstance(piece, (King, Queen)) ]
-		king_queen_forks, default_forks = [], []
-
-		for piece in friend_pieces:
-			movable_to = piece.movable_to(friends=friend_pieces, enemies=enemy_pieces)
-
-			default_piece_forks = [ pos for pos in movable_to if pos in enemy_dp_positions ]
-			king_queen_piece_forks = [ pos for pos in movable_to if pos in enemy_kq_positions ]
-			if default_piece_forks:
-				default_forks.append(default_piece_forks)
-			if king_queen_piece_forks:
-				king_queen_forks.append(king_queen_piece_forks)
-
-		w8 = len(default_forks)*.5 + len(king_queen_forks)*.8
-
-		return start_score * (w1 + w2 + w3 + w4 + w5 + w6 + w7 + w8)
-
 
 	@staticmethod
 	def board_movement(movement: list) -> str:
@@ -622,6 +497,20 @@ class Game(models.Model):
 							case 'King':
 								matrix[y][x] = 'K' + parts[1][0]
 		return '.' + '.'.join([ '.'.join(line)+'\n' for line in matrix ])
+
+	@staticmethod
+	def predict_result(user1: 'User', user2: 'User') -> int:
+		predict_score = lambda r1, r2: 1 / ( 1 + 10 * (r2 - r1) / 400 )
+		return predict_score(user1.score, user2.score), predict_score(user2.score, user1.score)
+
+	def result_score(self, color: str, winner_color: str) -> int:
+		user = self.get_user_by_color(color)
+		opponent = self.get_opponent_user(user)
+
+		k = 10 if user.score >= 2400 else (40 if user.games_count <= 30 else 20)
+		s = 1 if winner_color == color else (0.5 if winner_color == None else 0)
+
+		return k * (s + self.__class__.predict_result(user, opponent)[0])
 
 	def all_pieces_movements(self, color: str = None, return_dict: bool = False) -> list: # these are the available movements taking into account check for the king
 		res = list(set([

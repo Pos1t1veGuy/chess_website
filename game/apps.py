@@ -13,6 +13,8 @@ import random
 import os, sys, math
 import signal
 import imagehash
+import math
+import datetime as dt
 
 shutdown_handlers = []
 
@@ -22,19 +24,6 @@ class GameConfig(AppConfig):
     name = 'game'
     queue_consumers = []
     revengers = {}
-
-    async def game_ender(self):
-        while True:
-            from game.models import Game
-            
-            games = await sync_to_async( lambda: list(Game.objects.filter(playing=True)) )()
-            for game in games:
-                if await sync_to_async(game.passed_time)('black') - await sync_to_async(lambda: game.max_time)() >= 10:
-                    await sync_to_async(game.end)('white', res='time')
-                if await sync_to_async(game.passed_time)('white') - await sync_to_async(lambda: game.max_time)() >= 10:
-                    await sync_to_async(game.end)('black', res='time')
-
-            await asyncio.sleep(1)
 
     async def game_revenger(self):
         while True:
@@ -58,26 +47,23 @@ class GameConfig(AppConfig):
             from chess.consumers import queue_consumers
             self.queue_consumers = queue_consumers
 
-            processed_pair = []
+            sorted_queue = sorted(self.queue_consumers, key=lambda con: con.user.score)
 
-            for con1 in self.queue_consumers:
-                for con2 in self.queue_consumers:
-                    if not [con2, con1] in processed_pair:
-                        processed_pair.append([con1, con2])
+            for pair_index in range( math.floor(len(sorted_queue)/2) ):
+                con1 = sorted_queue[pair_index*2]
+                con2 = sorted_queue[pair_index*2+1]
 
-                        if con1.user != con2.user and await self.similar_players(con1.user, con2.user):
-                            intersection = list( list(set( range(con1.min, con1.max) ) & set( range(con2.min, con2.max) )) )
-
-                            if len(intersection) > 0 and not con1.user in con2.black_list and not con2.user in con1.black_list:
-                                if con1.searching and con2.searching:
-                                    con1.searching, con2.searching = False, False
-                                    con1.opponent, con2.opponent = con2, con1
-                                    await self.notice_queue_players(con1, con2)
-                                elif (con1.clicked and not con1.ready) or (con2.clicked and not con2.ready):
-                                    await con1.cancel(ban=con2.user)
-                                    await con2.cancel(ban=con1.user)
-                                elif con1.clicked and con1.ready and con2.clicked and con2.ready:
-                                    await self.start_game(*random.choice([[con1, con2], [con2, con1]]), await self.get_mid_time(con1, con2))
+                if con1.user != con2.user:
+                    if await self.get_mid_time(con1, con2) and not con1.user in con2.black_list and not con2.user in con1.black_list:
+                        if con1.searching and con2.searching:
+                            con1.searching, con2.searching = False, False
+                            con1.opponent, con2.opponent = con2, con1
+                            await self.notice_queue_players(con1, con2)
+                        elif (con1.clicked and not con1.ready) or (con2.clicked and not con2.ready):
+                            await con1.cancel(ban=con2.user)
+                            await con2.cancel(ban=con1.user)
+                        elif con1.clicked and con1.ready and con2.clicked and con2.ready:
+                            await self.start_game(*random.choice([[con1, con2], [con2, con1]]), await self.get_mid_time(con1, con2))
 
             await asyncio.sleep(1)
 
@@ -93,26 +79,7 @@ class GameConfig(AppConfig):
             }))
             await con.disconnect(0)
 
-    async def similar_players(self, user1: 'User', user2: 'User') -> bool:
-        # it means values in (user.value - interval -> user.value + interval)
-        level_interval = 2
-        winrate_interval = 5
-        games_interval = 10
-
-        user1_winrate = await sync_to_async(lambda: user1.winrate)()
-        user1_level = await sync_to_async(lambda: user1.level)()
-        user1_games_count = await sync_to_async(lambda: user1.games_count)()
-
-        user2_winrate = await sync_to_async(lambda: user2.winrate)()
-        user2_level = await sync_to_async(lambda: user2.level)()
-        user2_games_count = await sync_to_async(lambda: user2.games_count)()
-
-        if user1_level - level_interval <= user2_level <= user1_level + level_interval:
-            if user1_winrate - winrate_interval <= user2_winrate <= user1_winrate + winrate_interval:
-                if user1_games_count - games_interval <= user2_games_count <= user1_games_count + games_interval:
-                    return True
-
-        return False
+        await sync_to_async(game.start)()
 
     async def get_mid_time(self, con1: 'QueueConsumer', con2: 'QueueConsumer') -> int:
         intersection = list( list(set( range(con1.min, con1.max) ) & set( range(con2.min, con2.max) )) )
@@ -127,7 +94,7 @@ class GameConfig(AppConfig):
                 'name': await sync_to_async(lambda: con2.user.username)(),
                 'winrate': await sync_to_async(lambda: con2.user.winrate)(),
                 'level': await sync_to_async(lambda: con2.user.level)(),
-                'score': await sync_to_async(lambda: con2.user.global_score)(),
+                'score': await sync_to_async(lambda: con2.user.score)(),
                 'avatar': (await sync_to_async(lambda: con2.user.avatar)()).url
             }
         }))
@@ -138,7 +105,7 @@ class GameConfig(AppConfig):
                 'name': await sync_to_async(lambda: con1.user.username)(),
                 'winrate': await sync_to_async(lambda: con1.user.winrate)(),
                 'level': await sync_to_async(lambda: con1.user.level)(),
-                'score': await sync_to_async(lambda: con1.user.global_score)(),
+                'score': await sync_to_async(lambda: con1.user.score)(),
                 'avatar': (await sync_to_async(lambda: con1.user.avatar)()).url
             }
         }))
@@ -198,7 +165,6 @@ class GameConfig(AppConfig):
             asyncio.set_event_loop(loop)
             loop.run_until_complete(function())
 
-        threading.Thread(target=lambda: start_loop(self.game_ender), daemon=True).start()
         threading.Thread(target=lambda: start_loop(self.game_starter), daemon=True).start()
         threading.Thread(target=lambda: start_loop(self.game_revenger), daemon=True).start()
 

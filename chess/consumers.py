@@ -119,8 +119,7 @@ class QueueConsumer(AsyncWebsocketConsumer):
                     'type': 'queue_players_info',
                     'count': len(queue_consumers),
                     'winrate': sum([ await sync_to_async(lambda: con.user.winrate)() for con in queue_consumers ])/len(queue_consumers),
-                    'level': sum([ await sync_to_async(lambda: con.user.level)() for con in queue_consumers ])/len(queue_consumers),
-                    'score': sum([ await sync_to_async(lambda: con.user.global_score)() for con in queue_consumers ])/len(queue_consumers),
+                    'score': sum([ await sync_to_async(lambda: con.user.score)() for con in queue_consumers ])/len(queue_consumers),
                     'games': sum([ await sync_to_async(lambda: con.user.games_count)() for con in queue_consumers ])/len(queue_consumers)
                 }))
             except ZeroDivisionError:
@@ -367,12 +366,10 @@ class GameConsumer(AsyncWebsocketConsumer):
                     'opponent_info': {
                         'is_connected': await self.is_opponent_alive(),
                         'time': await sync_to_async(game.passed_time)(self.opponent_color),
-                        'score': await sync_to_async(lambda: (game.white_player_score if self.color == 'black' else game.black_player_score))(),
                         'check': opponent_check,
                     },
                     'self_info': {
                         'time': await sync_to_async(game.passed_time)(self.color),
-                        'score': await sync_to_async(lambda: (game.white_player_score if self.color == 'white' else game.black_player_score))(),
                         'check': self_check,
                     }
                 }))
@@ -436,7 +433,6 @@ class GameConsumer(AsyncWebsocketConsumer):
                 'opponent_lost_price': sum([ piece.price for piece in lost_pieces[0] ]),
                 'result': 'win',
             })
-        await self.disconnect(0)
     async def win(self, last_msg: bool = False):
         game = await sync_to_async(Game.objects.get)(id=self.game_id)
         lost_pieces = [
@@ -466,7 +462,6 @@ class GameConsumer(AsyncWebsocketConsumer):
                 'opponent_lost_price': sum([ piece.price for piece in lost_pieces[0] ]),
                 'result': 'lose',
             })
-        await self.disconnect(0)
     async def stalemate(self, last_msg: bool = False):
         game = await sync_to_async(Game.objects.get)(id=self.game_id)
         lost_pieces = [
@@ -496,7 +491,6 @@ class GameConsumer(AsyncWebsocketConsumer):
                 'opponent_lost_price': sum([ piece.price for piece in lost_pieces[0] ]),
                 'result': 'stalemate',
             })
-        await self.disconnect(0)
 
     async def give_up(self):
         game = await sync_to_async(Game.objects.get)(id=self.game_id)

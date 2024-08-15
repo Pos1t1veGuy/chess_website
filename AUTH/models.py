@@ -36,8 +36,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True, verbose_name='email')
     avatar = models.ImageField(upload_to=ModelUtils.avatar_filename, default=settings.DEFAULT_AVATAR_URL, verbose_name='Avatar Picture')
     last_updated = models.DateTimeField(auto_now=True, verbose_name='Last Update')
-    global_score = models.IntegerField(default=0, verbose_name='Global Score')
-    level = models.IntegerField(default=1, verbose_name='Level')
+    score = models.IntegerField(default=0, verbose_name='Score')
 
     def save(self, *args, **kwargs):
         if self.id:
@@ -49,12 +48,33 @@ class User(AbstractUser):
         super(User, self).save(*args, **kwargs)
 
     def set_score(self, new_score: int):
-        self.global_score = new_score
+        self.score = new_score
         self.save()
 
     def add_score(self, new_score: int):
-        self.global_score += new_score
+        self.score += new_score
         self.save()
+
+    @property
+    def level(self) -> str:
+        if self.score < 1000:
+            return 'Новичок'
+        elif self.score < 1400:
+            return 'Любитель'
+        elif self.score < 1600:
+            return 'Третий разряд'
+        elif self.score < 1800:
+            return 'Второй разряд'
+        elif self.score < 2000:
+            return 'Первый разряд'
+        elif self.score < 2200:
+            return 'Кандидат в мастера'
+        elif self.score < 2400:
+            return 'Национальный мастер'
+        elif self.score < 2500:
+            return 'Международный мастер'
+        else:
+            return 'Гроссмейстер'
 
     @property
     def games(self) -> List['Game']:
@@ -74,20 +94,6 @@ class User(AbstractUser):
             return 100.0
         else:
             return .0
-
-    @property
-    def level(self) -> int:
-        score_for_2_level = 10_000_000
-        new_level_score = score_for_2_level
-        level = 0
-        score = self.global_score
-
-        while score >= new_level_score:
-            new_level_score = level*100 * score_for_2_level
-            score -= new_level_score
-            level += 1
-
-        return level
 
     @property
     def lost_games(self) -> List['Game']:
@@ -125,5 +131,5 @@ class Message(models.Model):
             'author': self.author.username,
             'author_avatar': self.author.avatar.url,
             'content': self.content,
-            'date_sent': str(self.date_sent.strftime("%d/%m/%Y, %H:%M:%S")),
+            'date_sent': str(self.date_sent.strftime("%d.%m.%Y, %H:%M:%S")),
         }

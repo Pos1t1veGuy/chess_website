@@ -169,10 +169,10 @@
             <div class="player-card {% if game.white_player.id == user.id %}active{% endif %}">
                 <div class="player-avatar" style="background-image: url('{{ game.white_player.avatar.url }}');"></div>
                 <div class="player-name">@{{ game.white_player.username }}</div>
-                <div class="player-info">Счет: <span id="white-score">0</span></div>
+                <div class="player-info">{{ game.white_player.level }}</div>
                 <div class="player-info">Время: <span id="white-time">0</span> / {{ max_time }} сек</div>
-                <div class="player-info">Уровень: {{ game.white_player.level }}</div>
                 <div class="player-info">Винрейт: {{ game.white_player.winrate }}%</div>
+                <div class="player-info">Рейтинг: {{ game.white_player.winrate }}</div>
             </div>
             <div id="left-notifications"></div>
         </div>
@@ -183,10 +183,10 @@
             <div class="player-card {% if game.black_player.id == user.id %}active{% endif %}">
                 <div class="player-avatar" style="background-image: url('{{ game.black_player.avatar.url }}');"></div>
                 <div class="player-name">@{{ game.black_player.username }}</div>
-                <div class="player-info">Счет: <span id="black-score">0</span></div>
+                <div class="player-info">{{ game.black_player.level }}</div>
                 <div class="player-info">Время: <span id="black-time">0</span> / {{ max_time }} сек</div>
-                <div class="player-info">Уровень: {{ game.black_player.level }}</div>
                 <div class="player-info">Винрейт: {{ game.black_player.winrate }}%</div>
+                <div class="player-info">Рейтинг: {{ game.black_player.winrate }}</div>
             </div>
             <div id="right-notifications"></div>
         </div>
@@ -215,14 +215,10 @@
         const home_url = "{% url 'chess:home' %}"
         const mirrored = white_id !== user_id
 
-        const white_score = document.getElementById('white-score')
-        const black_score = document.getElementById('black-score')
         const white_time = document.getElementById('white-time')
         const black_time = document.getElementById('black-time')
 
-        let self_score
         let self_time
-        let opponent_score
         let opponent_time
         let self_notifications
         let opponent_notifications
@@ -236,9 +232,7 @@
 
             self_notifications = "left-notifications"
             opponent_notifications = "right-notifications"
-            self_score = white_score
             self_time = white_time
-            opponent_score = black_score
             opponent_time = black_time
         } else {
             color = 'black'
@@ -246,9 +240,7 @@
 
             self_notifications = "right-notifications"
             opponent_notifications = "left-notifications"
-            self_score = black_score
             self_time = black_time
-            opponent_score = white_score
             opponent_time = white_time
         }
 
@@ -327,10 +319,7 @@
                                 updateNotifications(opponent_notifications, 'Соперник потерял соединение', () => connected && !opponnent_is_connected)
                             }
                             self_time.textContent = data.self_info.time
-                            self_score.textContent = data.self_info.score
-
                             opponent_time.textContent = data.opponent_info.time
-                            opponent_score.textContent = data.opponent_info.score
 
                             self_check = data.self_info.check
                             opponent_check = data.opponent_info.check

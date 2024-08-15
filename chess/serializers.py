@@ -28,10 +28,16 @@ class GameSerializer(serializers.ModelSerializer):
         ]
 
     def get_white_passed_time(self, obj: 'Game') -> float:
-        return obj.passed_time('white')
+        if not obj.ended:
+            return obj.passed_time('white')
+        else:
+            return obj.white_player_time
 
     def get_black_passed_time(self, obj: 'Game') -> float:
-        return obj.passed_time('black')
+        if not obj.ended:
+            return obj.passed_time('black')
+        else:
+            return obj.black_player_time
 
     def get_destroyed_white_pieces(self, obj: 'Game') -> List[str]:
         return obj.lost_pieces_by_color('white')

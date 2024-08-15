@@ -77,7 +77,8 @@
                 @{{ white.username }}
             {% endif %}
         </h3>
-        <p>Счет: <span id="white_score">...</span></p>
+        <p>{{ white.level }}</p>
+        <p>Счет: <span id="white_score">Неизвестно до окончания игры</span></p>
         <p>Время: <span id="white_passed_time">...</span> / {{ game.max_time }}</p>
         <p>Потеряно фигур: <span id="destroyed_white_pieces">...</span></p>
     </div>
@@ -97,7 +98,8 @@
                 @{{ black.username }}
             {% endif %}
         </h3>
-        <p>Счет: <span id="black_score">...</span></p>
+        <p>{{ game.black_player.level }}</p>
+        <p>Счет: <span id="black_score">Неизвестно до окончания игры</span></p>
         <p>Время: <span id="black_passed_time">...</span> / {{ game.max_time }}</p>
         <p>Потеряно фигур: <span id="destroyed_black_pieces">...</span></p>
     </div>
@@ -119,22 +121,22 @@
         fetch(`/api/?key=game&id={{ game.id }}`)
             .then(response => response.json())
             .then(data => {
-                document.getElementById('white_score').textContent = data.white_player_score
                 document.getElementById('white_passed_time').textContent = data.white_passed_time
                 document.getElementById('destroyed_white_pieces').textContent = data.destroyed_white_pieces.length
 
-                document.getElementById('black_score').textContent = data.black_player_score
                 document.getElementById('black_passed_time').textContent = data.black_passed_time
                 document.getElementById('destroyed_black_pieces').textContent = data.destroyed_black_pieces.length
 
                 if (data.winner) {
                     document.getElementById('winner').textContent = `Победил: ${data.winner}`
                 } else {
-                    document.getElementById('winner').textContent = 'Победитель пока не определен'
+                    document.getElementById('winner').textContent = 'Победитель не определен'
                 }
 
                 if (data.ended && !data.playing) {
                     document.getElementById('game_status').textContent = 'Игра окончена'
+                    document.getElementById('white_score').textContent = data.white_player_score
+                    document.getElementById('black_score').textContent = data.black_player_score
                 } else if (!data.ended && !data.playing) {
                     document.getElementById('game_status').textContent = 'Игра приостановлена или не началась'
                 } else {

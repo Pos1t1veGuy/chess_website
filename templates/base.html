@@ -365,7 +365,7 @@
                     }
                 }
 
-                ws.onclose = function(event) {
+                ws.onclose = (event) => {
                     console.log('WebSocket is closed now.')
                     stop_game()
                 }
@@ -435,6 +435,11 @@
         }
 
         {% if user.is_authenticated %}
+            ws.onclose = (event) => {
+                console.log('Reconnecting to chat...')
+                ws_chat = new WebSocket('ws://' + window.location.host + '/ws/chat/')
+            }
+
             const chatSendButton = document.getElementById('chat-send-button')
             chatSendButton.onclick = () => {
                 const message = chatInput.value
